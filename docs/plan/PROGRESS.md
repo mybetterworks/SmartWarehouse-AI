@@ -10,6 +10,8 @@
 - 已形成软件需求规格说明书、概要设计说明书、详细设计说明书、数据库设计说明书和前端组件封装说明。
 - 已初始化 `docs/plan` 提示词开发体系。
 - 已调整开发顺序：先甲方组件库，再甲方前后端基座，再乙方各自前后端模块，最后多乙方交互业务。
+- 已将 `docs/design` 中的架构、业务功能、接口设计、数据库设计、前端组件、K8s、多实例、Jenkins、阿里弹性容器等要求按 V01-V08 拆分沉淀到各 milestone。
+- 后续开发具体版本时，直接读取当前 milestone，不再重复读取 `docs/design`，除非发生设计冲突、正式设计变更或用户明确要求追溯。
 - 本次计划调整按用户要求不写入 `decisions`。
 
 ## 2. 当前版本
@@ -70,7 +72,7 @@ V01 甲方组件库二次开发
 下一步从 V01 开始：
 
 ```text
-请根据 docs/plan/ROADMAP.md、docs/plan/DEVELOPMENT_RULE.md、docs/plan/PROGRESS.md 和 docs/plan/milestones/V01-owner-component-library.md，开发 V01 甲方组件库二次开发与最小项目骨架版本。
+请根据 docs/plan/ROADMAP.md、docs/plan/DEVELOPMENT_RULE.md、docs/plan/PROGRESS.md 和 docs/plan/milestones/V01-owner-component-library.md，开发 V01 甲方组件库二次开发与最小项目骨架版本。开发时直接使用 V01 milestone 中的版本开发输入边界，不要重复读取 docs/design，除非发现设计冲突或用户明确要求。
 ```
 
 V01 完成后需要更新：
@@ -131,6 +133,21 @@ README 更新结果：
 - 明确 Jenkins 负责测试环境，本地构建测试发布。
 - 明确阿里弹性容器负责正式环境部署和正式版本演示。
 - 按用户要求，本次调整不写入 `docs/plan/decisions`。
+
+下一步：
+
+- 开始 V01 甲方组件库二次开发与最小项目骨架。
+
+### 2026-06-11 milestone 开发输入补全
+
+状态：DONE
+
+完成内容：
+
+- 将 `docs/design` 下正式设计文档中的项目架构、业务功能、接口设计、数据库设计、前端组件封装、K8s 多实例、Jenkins 和阿里弹性容器要求拆分到 V01-V08 milestone。
+- 每个 milestone 都补充了版本开发输入边界，明确后续开发该版本时不需要重复读取 `docs/design`。
+- 每个 milestone 都补充了代码架构、业务功能、接口设计、数据库设计、前端页面、测试、验收和发布检查要求。
+- 同步调整 ROADMAP、DEVELOPMENT_RULE、PROGRESS 和版本拆分决策说明，避免提示词入口与 milestone 说明不一致。
 
 下一步：
 

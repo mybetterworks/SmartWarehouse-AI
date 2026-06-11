@@ -181,7 +181,7 @@ SmartWarehouse-AI
 4. 完成后运行自动测试、必要启动验证、Jenkins 测试环境验证和阿里弹性容器正式环境发布检查。
 5. 更新当前 milestone 的实现记录。
 6. 更新对应 study 和 handle 文件。
-7. 更新 PROGRESS.md。
+7. 更新 PROGRESS.md 和根目录 README.md。
 8. 自动执行验证、复盘、决策记录判断、skill 检查与更新、手搓步骤更新。
 9. 如使用过的 skill 流程失效或因本次问题解决发生变化，必须在问题解决后同步更新对应 skill。
 10. 自动检查并更新 `.gitignore`，确保新增的构建产物、临时文件、IDE 文件、日志、密钥文件和本地配置不会进入 Git。
@@ -192,7 +192,7 @@ SmartWarehouse-AI
 ### 7.2 继续当前版本
 
 ```text
-请读取 docs/plan/PROGRESS.md，继续当前 IN_PROGRESS 版本的开发。先检查已完成内容，再补齐未完成任务。完成后自动执行验证、复盘、决策记录判断、skill 检查与更新、.gitignore 更新、敏感信息检查、手搓步骤更新，并更新对应 milestone、study、handle 和 PROGRESS.md。
+请读取 docs/plan/PROGRESS.md，继续当前 IN_PROGRESS 版本的开发。先检查已完成内容，再补齐未完成任务。完成后自动执行验证、复盘、决策记录判断、skill 检查与更新、.gitignore 更新、敏感信息检查、README 更新、手搓步骤更新，并更新对应 milestone、study、handle、PROGRESS.md 和根目录 README.md。
 ```
 
 ### 7.3 自动收尾动作
@@ -205,7 +205,8 @@ SmartWarehouse-AI
 4. 自动沉淀或更新 skill：如果出现复杂通用问题，新增或更新 `docs/plan/skill` 下的 skill；如果使用既有 skill 时发现流程失效、不完整或已被本次实现改变，必须在问题解决后同步修正该 skill。
 5. 自动更新 `.gitignore`：每次新增项目、模块、构建脚本、依赖目录、日志目录、本地配置或密钥文件时，检查 `.gitignore` 是否需要补充，并在当前开发任务中同步更新。
 6. 自动检查敏感信息：检查准备纳入 Git 的文件是否包含密码、token、API Key、私钥、`.npmrc` 凭证、数据库连接串、Jenkins 凭证、阿里云密钥、LLM Key 或个人隐私；发现后改为统一配置或示例模板。
-7. 自动生成手搓步骤：更新对应 handle 文件，补充环境准备、命令、关键代码位置、核心代码片段、验证命令、常见错误和手动还原步骤。
+7. 自动更新根目录 README：版本开发完成、代码结构变化、业务功能变化、技术栈变化、部署方式变化或重要开发规则变化时，必须同步更新根目录 `README.md`。
+8. 自动生成手搓步骤：更新对应 handle 文件，补充环境准备、命令、关键代码位置、核心代码片段、验证命令、常见错误和手动还原步骤。
 
 ## 8. 提示词系统运行规则
 
@@ -213,11 +214,12 @@ SmartWarehouse-AI
 2. 根据 `PROGRESS.md` 找到当前版本或下一个版本。
 3. 按对应 milestone 的范围开发，不跨版本扩张功能。
 4. 每个版本完成后必须可演示或可运行。
-5. 每个版本完成后必须更新 milestone、study、handle 和 `PROGRESS.md`。
+5. 每个版本完成后必须更新 milestone、study、handle、`PROGRESS.md` 和根目录 `README.md`。
 6. 从甲方基座版本开始，每个版本都要保留 Jenkins 测试发布和阿里弹性容器正式发布的验证记录。
 7. 有重大取舍时通常写入 `decisions`；如果用户明确要求某次调整不计入 decisions，则只更新计划文档。
 8. 有可复用复杂经验时优先沉淀到 `skill`。
 9. 使用既有 skill 发现流程失效、遗漏关键步骤或与当前项目规则不一致时，先解决当前问题，再立即更新对应 skill，确保后续仍正确可用。
 10. 每次开发新增文件后都要自动评估 `.gitignore`，避免构建产物、依赖目录、本地配置、日志和密钥文件被提交。
 11. 每次开发完成前都要自动做敏感信息检查；发现敏感信息时，先迁移到环境变量、Nacos、Secret、Jenkins 凭证、阿里弹性容器环境配置或 `.example` 模板，再继续验收。
-12. 正式设计以 `docs/design` 下文件为准，`docs/plan` 用于驱动开发、复盘和学习。
+12. 版本开发完成或修改代码、业务、架构、部署、技术栈时，必须同步更新根目录 `README.md`，保证项目入口说明与当前实现一致。
+13. 正式设计以 `docs/design` 下文件为准，`docs/plan` 用于驱动开发、复盘和学习。

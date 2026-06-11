@@ -79,6 +79,7 @@ V01 完成后需要更新：
 - `milestones/V01-owner-component-library.md`
 - `study/V01-owner-component-library-study.md`
 - `handle/V01-owner-component-library-handle.md`
+- 根目录 `README.md`
 
 ## 6. 进度记录模板
 
@@ -96,6 +97,7 @@ Jenkins 测试发布结果：
 阿里弹性容器正式发布检查：
 .gitignore 更新结果：
 敏感信息检查结果：
+README 更新结果：
 验证结果：
 遗留问题：
 下一步：

@@ -1,0 +1,89 @@
+# IDE and editor files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and temp files
+logs/
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Java / Maven / Gradle
+target/
+*.class
+.gradle/
+build/
+out/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+.nuxt/
+.next/
+coverage/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.local
+application-local.yml
+application-local.yaml
+bootstrap-local.yml
+bootstrap-local.yaml
+
+# Private package manager credentials
+.npmrc
+
+# Certificates and private keys
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Docker / runtime generated data
+docker-data/
+data/mysql/
+data/redis/
+data/rabbitmq/
+data/nacos/
+data/minio/
+
+# Build and release artifacts
+*.jar
+*.war
+*.ear
+*.zip
+*.tar
+*.tar.gz
+
+# Keep example files trackable
+!*.example
+!*.example.yml
+!*.example.yaml
+!*.template.yml
+!*.template.yaml

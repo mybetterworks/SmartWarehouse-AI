@@ -57,3 +57,16 @@ PROPOSED
 2. 用户明确给出的业务或技术决定必须记录。
 3. AI 提出的建议如果需要用户确认，先创建 `PROPOSED` 状态。
 4. 已确认的决策改为 `ACCEPTED`，开发时必须遵守。
+
+## 5. 当前决策
+
+| 编号 | 决策 | 状态 |
+|---|---|---|
+| 0001 | `docs/design` 扁平存储，`docs/plan` 存提示词系统 | ACCEPTED |
+| 0002 | 甲方/乙方独立项目边界 | ACCEPTED |
+| 0003 | 8 个敏捷版本拆分 | ACCEPTED |
+| 0004 | 组件文档站与 Playground 四层结构 | SUPERSEDED |
+| 0005 | 企业组件库文档站两模块结构 | SUPERSEDED |
+| 0006 | 企业组件库文档站三入口结构 | SUPERSEDED |
+| 0007 | 组件入口单组件详情边界 | ACCEPTED |
+| 0008 | 删除预设式静态 Playground，保留组件与场景模板两入口 | ACCEPTED |

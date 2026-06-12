@@ -13,6 +13,14 @@
 9. Jenkins 测试环境和阿里弹性容器正式环境要尽早接入，并贯穿后续版本。
 10. 当前 `docs/design` 下的设计要求已经预先拆分到各 milestone；开发具体版本时不要重复读取 `docs/design`，除非发现 milestone 与正式设计冲突、需要修改正式设计，或用户明确要求追溯设计依据。
 
+### 1.1 代码注释与学习友好规则
+
+1. 本项目是个人技术与业务实践项目，开发代码时必须增加详细中文注释，便于后续手动复现、学习理解和面试复盘。
+2. Java、Python、TypeScript / Vue 代码中的类、组件、方法、函数、组合式函数、DTO、事件对象、配置类、任务类和关键业务流程，都应补充中文说明。
+3. 复杂逻辑、关键判断、幂等控制、事务边界、缓存 Key、MQ 消息、权限判断、登录风控、库存预扣、异步任务、RAG 检索、Agent 调用、ChatBI SQL 限制等关键代码行，应在代码附近写明“为什么这样做”和“对应的业务含义”。
+4. 注释以帮助理解为目标，避免只重复语法含义的空注释，例如“给变量赋值”“调用方法”等无信息量描述。
+5. 新增或修改代码后，应检查本次涉及的核心类、方法和关键代码行是否已补充中文注释；如缺失，应在提交前补齐。
+
 ## 2. 本地开发环境
 
 本地开发系统：
@@ -34,7 +42,7 @@ Jenkins
 使用规则：
 
 1. Java 服务使用本地 JDK 17 和 Maven 开发、编译、测试。
-2. 前端项目使用本地 Node v22.22.3 开发、构建、测试。
+2. 前端项目使用本地 Node v22.22.3 开发、构建、测试；pnpm 优先通过 `corepack pnpm` 执行，避免 Windows PowerShell 执行策略或未安装全局 pnpm 导致命令失败。
 3. 中间件、数据库和基础设施优先使用 Docker 容器。
 4. Jenkins 负责本地构建、自动测试和测试环境发布。
 5. 阿里弹性容器负责正式环境部署和正式版本演示。
@@ -95,10 +103,15 @@ target/
 node_modules/
 dist/
 .vite/
+.vitepress/cache/
+.vitepress/dist/
+.pnpm-store/
 .idea/
 .vscode/
 logs/
 *.log
+*.tgz
+pnpm-debug.log*
 .env
 .env.*
 !.env.example
@@ -234,6 +247,15 @@ npm 制品：
 5. 稳定版本使用 release npm 仓库或 `latest` tag。
 6. 联调版本使用 snapshot npm 仓库或 `next` / `snapshot` tag。
 7. `.npmrc` 和 token 只允许用于构建阶段，不得进入最终镜像。
+8. 平台组件包变更时，必须同步维护 `frontend-platform/apps/docs` 企业组件文档站，公开入口固定为 `组件` 和 `场景模板`。
+9. `组件` 入口用于与业务无关的组件级目录和组件详情，新增组件必须更新 `/component/overview`、对应组件详情或总览状态。
+10. `场景模板` 入口用于多组件组合模板，原“大块功能组合展示”必须归入 `/scenario/overview`，不得继续混入组件级目录。
+11. `组件` 和 `场景模板` 的总览展示必须复用 `apps/docs/src/CatalogOverview.vue`，目录数据集中维护在 `apps/docs/src/componentCatalog.ts`，不得为两个入口复制两套卡片、分组和状态展示代码。
+12. 发布平台组件包前必须执行文档站构建，确保文档页从 `@smartwarehouse/platform-ui` 包入口导入成功。
+13. 组件详情页示例代码统一使用 Vue + TypeScript SFC 写法，标题标注为 `示例代码（Vue + TypeScript）`，Vue 示例代码块必须包含 `<script setup lang="ts">`。
+14. 文档站“基础用法”外层 Demo 容器保持统一宽度；窄组件使用内部 wrapper 控制展示尺寸，不得为了单个组件缩窄外层 `.sw-doc-preview`。
+15. AI、BI、SQL、JSON、Agent、MCP 工具调用等长内容组件必须在文档站中验证不撑破 Demo 容器，必要时同时调整组件样式和 VitePress theme 覆盖规则。
+16. 不再维护预设式静态 Playground；除非升级为可在线编辑代码并实时预览的真实 Playground，否则不得恢复 `/playground` 公开入口或新增 Playground 预设。
 
 ## 8. Jenkins 与阿里弹性容器发布规则
 
@@ -300,6 +322,7 @@ Jenkins 发布要求：
 7. 每个版本都要记录 Jenkins 测试发布结果。
 8. 从 V02 开始，每个版本都要记录阿里弹性容器正式发布检查结果。
 9. 验证结果写入 milestone 的“实现记录”。
+10. 平台组件库变更时，除包构建和 dry-run 外，还要验证 VitePress 文档站构建产物，必要时检查 `.vitepress/dist` 中关键页面内容。
 
 ## 11. 文档更新规则
 

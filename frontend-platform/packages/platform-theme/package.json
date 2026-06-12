@@ -1,0 +1,28 @@
+{
+  "name": "@smartwarehouse/platform-theme",
+  "version": "0.1.0",
+  "description": "Shared theme tokens and Element Plus overrides for SmartWarehouse-AI.",
+  "type": "module",
+  "main": "./dist/index.umd.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./style.css": "./src/style.css"
+  },
+  "files": ["dist", "src/style.css"],
+  "sideEffects": ["*.css", "src/style.css"],
+  "scripts": {
+    "build": "vite build"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.4"
+  }
+}

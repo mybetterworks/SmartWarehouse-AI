@@ -17,6 +17,7 @@ logs/
 *.temp
 tmp/
 temp/
+.tmp*/
 
 # Java / Maven / Gradle
 target/
@@ -29,10 +30,17 @@ out/
 node_modules/
 dist/
 .vite/
+.vitepress/cache/
+.vitepress/dist/
+**/.vitepress/cache/
+**/.vitepress/dist/
+.pnpm-store/
 .nuxt/
 .next/
 coverage/
 *.tsbuildinfo
+*.tgz
+pnpm-debug.log*
 
 # Python
 __pycache__/

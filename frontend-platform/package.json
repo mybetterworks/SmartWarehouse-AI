@@ -1,0 +1,32 @@
+{
+  "name": "smartwarehouse-frontend-platform",
+  "version": "0.1.0-snapshot.1",
+  "private": true,
+  "description": "Owner frontend platform workspace for SmartWarehouse-AI.",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "build": "corepack pnpm build:packages && corepack pnpm build:docs",
+    "build:packages": "corepack pnpm --filter @smartwarehouse/platform-types build && corepack pnpm --filter @smartwarehouse/platform-theme build && corepack pnpm --filter @smartwarehouse/platform-sdk build && corepack pnpm --filter @smartwarehouse/platform-ui build",
+    "build:docs": "corepack pnpm --filter @smartwarehouse/component-docs build",
+    "dev:docs": "corepack pnpm --filter @smartwarehouse/component-docs dev",
+
+    "publish:dry-run:snapshot": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks --dry-run",
+
+    "publish:dry-run:release": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks --dry-run",
+
+    "publish:snapshot": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks",
+
+    "publish:release": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks",
+
+    "typecheck": "corepack pnpm --filter @smartwarehouse/platform-ui typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.4",
+    "vitepress": "^1.6.3",
+    "vue-tsc": "^2.2.10"
+  }
+}

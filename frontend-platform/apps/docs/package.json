@@ -1,0 +1,24 @@
+{
+  "name": "@smartwarehouse/component-docs",
+  "version": "0.1.0-snapshot.1",
+  "private": true,
+  "description": "VitePress documentation for SmartWarehouse-AI platform components.",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev . --host 0.0.0.0",
+    "build": "vitepress build .",
+    "preview": "vitepress preview . --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "@smartwarehouse/platform-sdk": "workspace:*",
+    "@smartwarehouse/platform-theme": "workspace:*",
+    "@smartwarehouse/platform-types": "workspace:*",
+    "@smartwarehouse/platform-ui": "workspace:*",
+    "element-plus": "^2.9.8",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  }
+}

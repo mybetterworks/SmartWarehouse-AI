@@ -1,0 +1,24 @@
+{
+  "name": "@smartwarehouse/platform-sdk",
+  "version": "0.1.0",
+  "description": "Frontend SDK for SmartWarehouse-AI platform integration.",
+  "type": "module",
+  "main": "./dist/index.umd.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@smartwarehouse/platform-types": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.4"
+  }
+}

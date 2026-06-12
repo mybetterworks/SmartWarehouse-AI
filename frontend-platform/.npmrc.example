@@ -1,0 +1,32 @@
+# ============================================================
+# .npmrc.example — 本地开发与 CI 模板
+# ============================================================
+# 本地开发：将本文件复制为 .npmrc，填入真实 token（已被 .gitignore 忽略）
+# CI 构建：通过环境变量注入真实值
+# ============================================================
+
+# 所有包从阿里云效私库下载（代理官方 npm，国内下载更快）
+registry=https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/
+
+# @smartwarehouse scope 的包发布和下载走这个地址
+@smartwarehouse:registry=https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/
+
+# 认证 — 本地开发时填入真实 token
+always-auth=true
+//packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/:_authToken=${SMARTWAREHOUSE_SNAPSHOT_TOKEN}
+//packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/:_authToken=${SMARTWAREHOUSE_RELEASE_TOKEN}
+
+# 二进制包国内镜像（加速 node-sass 等编译）
+sass_binary_site="https://npmmirror.com/mirrors/node-sass/"
+phantomjs_cdnurl="https://cdn.npmmirror.com/binaries/phantomjs"
+electron_mirror="https://cdn.npmmirror.com/binaries/electron/"
+sqlite3_binary_host_mirror="https://foxgis.oss-cn-shanghai.aliyuncs.com/"
+chromedriver_cdnurl="https://cdn.npmmirror.com/binaries/chromedriver"
+
+# ============================================================
+# 发布命令（已定义在根 package.json 中，直接运行即可）
+#   corepack pnpm publish:snapshot            发 snapshot 版
+#   corepack pnpm publish:release             发 release 正式版
+#   corepack pnpm publish:dry-run:snapshot    发前预演
+#   corepack pnpm publish:dry-run:release     发前预演
+# ============================================================

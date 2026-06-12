@@ -1,0 +1,43 @@
+{
+  "name": "@smartwarehouse/platform-ui",
+  "version": "0.1.0",
+  "description": "Element Plus based enterprise component library for SmartWarehouse-AI.",
+  "type": "module",
+  "main": "./dist/index.umd.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./style.css": "./dist/index.css"
+  },
+  "files": ["dist"],
+  "sideEffects": ["*.css"],
+  "scripts": {
+    "build": "vite build && vue-tsc -p tsconfig.json --emitDeclarationOnly",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@smartwarehouse/platform-sdk": "workspace:*",
+    "@smartwarehouse/platform-theme": "workspace:*",
+    "@smartwarehouse/platform-types": "workspace:*"
+  },
+  "peerDependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "element-plus": "^2.9.8",
+    "vue": "^3.5.13"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "devDependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "element-plus": "^2.9.8",
+    "vite": "^6.3.5",
+    "vue": "^3.5.13",
+    "vue-tsc": "^2.2.10"
+  }
+}

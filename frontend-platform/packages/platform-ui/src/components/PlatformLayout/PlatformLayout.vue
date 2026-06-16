@@ -59,6 +59,9 @@
           <UserDropdown :user="user" @command="emit('userCommand', $event)" @logout="emit('logout')" />
         </div>
       </header>
+      <div v-if="$slots.subheader" class="sw-layout__subheader">
+        <slot name="subheader" />
+      </div>
       <main class="sw-layout__content">
         <slot />
       </main>

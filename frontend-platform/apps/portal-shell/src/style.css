@@ -63,33 +63,123 @@ body {
   margin-top: 16px;
 }
 
+.portal-tabs-shell {
+  padding: 0 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 252, 0.94)),
+    radial-gradient(circle at top left, rgba(29, 99, 237, 0.08), transparent 40%);
+}
+
+.portal-tabs {
+  --el-tabs-header-height: 48px;
+}
+
+.portal-tabs .el-tabs__header {
+  margin: 0;
+}
+
+.portal-tabs .el-tabs__nav-wrap::after,
+.portal-tabs .el-tabs__content {
+  display: none;
+}
+
+.portal-tabs .el-tabs__item {
+  max-width: 240px;
+  height: 48px;
+  padding: 0 18px;
+  border-bottom: 0;
+}
+
+.portal-tabs .el-tabs__item.is-active {
+  color: #1d63ed;
+}
+
+.portal-tabs__label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-tabs__icon {
+  flex-shrink: 0;
+  color: #5f6b85;
+}
+
+.portal-tabs .el-tabs__item.is-active .portal-tabs__icon {
+  color: #1d63ed;
+}
+
+.portal-tabs__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-tab-view,
+.portal-tab-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.sw-platform-page__body:has(> .portal-workbench-shell) {
+  overflow: hidden;
+}
+
+.portal-workbench-shell {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
 .portal-workbench {
   display: grid;
+  min-width: 0;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 18px;
 }
 
 .portal-card {
+  display: flex;
   grid-column: span 6;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
   padding: 22px;
   border: 1px solid #dbe3f0;
   border-radius: 20px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 252, 0.92));
   box-shadow: 0 18px 38px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
 }
 
 .portal-card--hero {
   grid-column: span 12;
   display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 24px;
   background:
     radial-gradient(circle at top right, rgba(29, 99, 237, 0.14), transparent 30%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 247, 255, 0.96));
 }
 
+.portal-card--hero > * {
+  min-width: 0;
+}
+
+.portal-card--hero > :first-child {
+  flex: 1 1 320px;
+}
+
 .portal-card__header {
   display: flex;
+  flex: 0 0 auto;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
@@ -112,9 +202,15 @@ body {
 
 .portal-card__pill-list {
   display: flex;
+  flex: 0 1 220px;
   flex-wrap: wrap;
   gap: 10px;
+  align-self: flex-start;
   align-content: flex-start;
+  justify-content: flex-end;
+  margin-left: auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .portal-pill {
@@ -131,8 +227,11 @@ body {
 
 .portal-list {
   display: grid;
+  min-height: 0;
   gap: 12px;
   margin: 0;
+  align-content: start;
+  overflow: visible;
   padding: 0;
   list-style: none;
 }
@@ -148,15 +247,21 @@ body {
   background: rgba(255, 255, 255, 0.82);
 }
 
+.portal-list__item > * {
+  min-width: 0;
+}
+
 .portal-list__item strong {
   display: block;
   margin-bottom: 6px;
+  overflow-wrap: anywhere;
 }
 
 .portal-list__item p {
   margin: 0;
   color: #5a6a84;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .portal-list__item--empty {
@@ -165,20 +270,28 @@ body {
 }
 
 .portal-list__meta {
+  flex-shrink: 0;
+  max-width: 40%;
   color: #6b7890;
   font-size: 12px;
-  white-space: nowrap;
+  text-align: right;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .portal-module-grid {
   display: grid;
+  min-height: 0;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 14px;
+  align-content: start;
+  overflow: visible;
 }
 
 .portal-module-card {
   display: grid;
   gap: 8px;
+  min-width: 0;
   padding: 16px;
   border: 1px solid #dbe6f3;
   border-radius: 16px;
@@ -200,6 +313,12 @@ body {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.portal-module-card strong,
+.portal-module-card small,
+.portal-card--hero p {
+  overflow-wrap: anywhere;
 }
 
 .portal-module-card small {
@@ -292,6 +411,15 @@ body {
     padding: 32px 20px;
   }
 
+  .portal-tabs-shell {
+    padding: 0 12px;
+  }
+
+  .portal-tabs .el-tabs__item {
+    max-width: 180px;
+    padding: 0 14px;
+  }
+
   .portal-workbench {
     grid-template-columns: 1fr;
   }
@@ -304,4 +432,16 @@ body {
   .portal-card--hero {
     flex-direction: column;
   }
+
+  .portal-card--hero > :first-child,
+  .portal-card__pill-list {
+    flex: none;
+  }
+
+  .portal-card__pill-list {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
 }

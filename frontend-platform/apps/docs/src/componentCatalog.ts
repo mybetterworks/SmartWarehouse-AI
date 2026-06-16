@@ -541,7 +541,7 @@ export const scenarioTemplateCatalog: CatalogItemMeta[] = [
     name: '门户工作台模板',
     title: 'PlatformLayout + Workbench',
     group: 'foundation',
-    description: '用于 portal-shell 的工作台首页：隐藏左侧菜单，保留统一顶部栏、工作台按钮和模块抽屉。右侧内容区用于承载个人信息、消息、常用模块、最近访问和登录记录。',
+    description: '用于 portal-shell 的工作台首页：隐藏左侧菜单，在 PlatformLayout 的 subheader 中承载固定“平台工作台”tab，并由 host 持久化当前 tab 与最近打开模块。右侧内容区用于承载个人信息、消息、常用模块、最近访问和登录记录。',
     scenarios: ['门户工作台', '统一登录后首页', '模块总控制台'],
     components: ['PlatformLayout', 'PlatformPage', 'UserDropdown'],
     tags: ['layout', 'portal', 'workbench']
@@ -551,7 +551,7 @@ export const scenarioTemplateCatalog: CatalogItemMeta[] = [
     name: '标准后台布局',
     title: 'PlatformLayout + Hosted Navigation',
     group: 'foundation',
-    description: '用于进入具体业务模块后的统一后台布局：顶部固定工作台按钮、左上角模块抽屉、按当前 active module 切换侧边菜单。适用于 portal-shell 托管 remote 内容，也适用于 sys-web 独立模式复用同一布局能力。',
+    description: '用于进入具体业务模块后的统一后台布局：host 在顶部 subheader 承载持久化模块 tabs，左侧根据当前 active module 展示带图标的二级/多级菜单，remote 只负责 tabs 下方的业务内容区。适用于 portal-shell 托管 remote 内容，也适用于 sys-web 独立模式复用同一布局能力。',
     scenarios: ['Hosted sys-web', '门户内业务模块', '独立后台壳层'],
     components: ['PlatformLayout', 'SideMenu', 'BreadcrumbNav', 'UserDropdown'],
     tags: ['layout', 'template']

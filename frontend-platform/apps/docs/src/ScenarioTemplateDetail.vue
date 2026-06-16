@@ -19,32 +19,58 @@
       <template v-if="doc.slug === 'portal-workbench'">
         <PlatformLayout
           title="SmartWarehouse-AI"
-          brand-abbr="SW-AI"
           :menus="[]"
           :breadcrumbs="portalBreadcrumbs"
           :user="demoUser"
           :module-entries="moduleEntries"
+          :show-workbench-button="false"
           show-workbench-drawer-button
           show-module-drawer-trigger
           :show-aside="false"
         >
-          <PlatformPage title="Portal Workbench" description="The portal home keeps the content area full width and surfaces workbench modules only.">
-            <div class="sw-demo-grid">
+          <template #subheader>
+            <section class="sw-doc-tabs-shell">
+              <el-tabs class="sw-doc-tabs" type="card" :model-value="portalWorkbenchTabId">
+                <el-tab-pane name="/portal" :closable="false">
+                  <template #label>
+                    <span class="sw-doc-tabs__label">
+                      <el-icon class="sw-doc-tabs__icon"><House /></el-icon>
+                      <span>平台工作台</span>
+                    </span>
+                  </template>
+                </el-tab-pane>
+              </el-tabs>
+            </section>
+          </template>
+
+          <PlatformPage title="平台工作台" description="工作台作为固定首个 tab 呈现，portal-shell 刷新后仍可恢复当前 tab 与最近打开模块。">
+            <template #toolbar>
+              <el-button type="primary">刷新工作台</el-button>
+            </template>
+            <div class="sw-doc-layout-note">
+              <strong>统一壳层管理 tab。</strong>
+              <span>工作台和业务模块都在同一个 portal-shell 内切换，tab 状态由 host 统一持久化。</span>
+            </div>
+            <div class="sw-demo-grid sw-demo-grid--portal">
               <div class="sw-demo-panel">
-                <strong>Profile</strong>
-                <p>{{ demoUser.nickname }} / {{ demoUser.username }}</p>
+                <p class="sw-demo-panel__eyebrow">Profile</p>
+                <strong>{{ demoUser.nickname }}</strong>
+                <p>{{ demoUser.username }} / 最近登录今日 09:30</p>
               </div>
               <div class="sw-demo-panel">
-                <strong>Messages</strong>
-                <p>3 pending approvals, 2 inventory alerts</p>
+                <p class="sw-demo-panel__eyebrow">Messages</p>
+                <strong>3 条待处理消息</strong>
+                <p>2 条库存预警，1 条审批提醒</p>
               </div>
               <div class="sw-demo-panel">
-                <strong>Common Modules</strong>
-                <p>System Management, Warehouse Management</p>
+                <p class="sw-demo-panel__eyebrow">Common</p>
+                <strong>常用模块</strong>
+                <p>系统管理、仓储管理、任务中心</p>
               </div>
               <div class="sw-demo-panel">
-                <strong>Login Records</strong>
-                <p>Last sign-in: today 09:30 / Shanghai</p>
+                <p class="sw-demo-panel__eyebrow">Security</p>
+                <strong>登录记录</strong>
+                <p>最近登录：今日 09:30 / Shanghai</p>
               </div>
             </div>
           </PlatformPage>
@@ -53,18 +79,56 @@
 
       <template v-else-if="doc.slug === 'standard-layout'">
         <PlatformLayout
-          title="SW-AI"
-          brand-abbr="SW-AI"
-          :menus="menus"
-          :breadcrumbs="workbenchBreadcrumbs"
+          title="SmartWarehouse-AI"
+          :menus="layoutMenus"
+          :breadcrumbs="standardLayoutBreadcrumbs"
           :user="demoUser"
+          :active-path="activeLayoutTabId"
           :module-entries="moduleEntries"
           active-module-code="sys"
+          :show-workbench-button="false"
           show-workbench-drawer-button
           show-module-drawer-trigger
           v-model:collapsed="layoutCollapsed"
+          @menu-click="handleLayoutPreviewMenuClick"
         >
-          <div class="sw-demo-panel">业务子应用内容区</div>
+          <template #subheader>
+            <section class="sw-doc-tabs-shell">
+              <el-tabs class="sw-doc-tabs" type="card" :model-value="activeLayoutTabId" @tab-change="handleLayoutTabChange">
+                <el-tab-pane v-for="tab in layoutTabs" :key="tab.id" :name="tab.id">
+                  <template #label>
+                    <span class="sw-doc-tabs__label">
+                      <el-icon class="sw-doc-tabs__icon">
+                        <component :is="tab.icon" />
+                      </el-icon>
+                      <span>{{ tab.title }}</span>
+                    </span>
+                  </template>
+                </el-tab-pane>
+              </el-tabs>
+            </section>
+          </template>
+
+          <PlatformPage :title="layoutPreviewState.title" :description="layoutPreviewState.description">
+            <template #toolbar>
+              <el-button type="primary">{{ layoutPreviewState.actionText }}</el-button>
+            </template>
+            <section class="sw-doc-layout-shell">
+              <section class="sw-doc-layout-body">
+              <div class="sw-doc-layout-note">
+                <strong>Host 负责导航与 tabs。</strong>
+                <span>{{ layoutPreviewState.note }}</span>
+              </div>
+              <div class="sw-doc-summary-grid">
+                <article v-for="item in layoutPreviewState.metrics" :key="item.label" class="sw-doc-summary-card">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                </article>
+              </div>
+              <PlatformTable :columns="tableColumns" :data="layoutPreviewState.rows" />
+              </section>
+            </section>
+          </PlatformPage>
         </PlatformLayout>
       </template>
 
@@ -165,7 +229,8 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { CollectionTag, House, Lock, User } from '@element-plus/icons-vue'
+import { computed, reactive, ref } from 'vue'
 import type {
   AgentStep,
   AlertItem,
@@ -226,9 +291,26 @@ const props = defineProps<{
 
 const doc = getScenarioTemplateDoc(props.slug)
 
-const menus: NavMenuItem[] = [
-  { id: 'sys', title: '系统管理', path: '/sys', moduleCode: 'sys' },
-  { id: 'wms', title: '仓储管理', path: '/wms/material', moduleCode: 'wms' }
+const layoutMenus: NavMenuItem[] = [
+  {
+    id: 'sys-access',
+    title: '组织权限',
+    path: '/sys/access',
+    icon: 'UserFilled',
+    moduleCode: 'sys',
+    children: [
+      { id: 'sys-users', title: '用户管理', path: '/sys/users', icon: 'User', moduleCode: 'sys' },
+      { id: 'sys-roles', title: '角色管理', path: '/sys/roles', icon: 'Lock', moduleCode: 'sys' }
+    ]
+  },
+  {
+    id: 'sys-base',
+    title: '基础配置',
+    path: '/sys/base',
+    icon: 'Setting',
+    moduleCode: 'sys',
+    children: [{ id: 'sys-dicts', title: '字典管理', path: '/sys/dicts', icon: 'CollectionTag', moduleCode: 'sys' }]
+  }
 ]
 
 const moduleEntries: FrontendModule[] = [
@@ -251,10 +333,72 @@ const moduleEntries: FrontendModule[] = [
 ]
 
 const portalBreadcrumbs: BreadcrumbItem[] = [{ title: '工作台', path: '/portal' }]
-const workbenchBreadcrumbs: BreadcrumbItem[] = [{ title: '工作台', path: '/portal' }, { title: '系统管理', path: '/sys/users' }]
 const breadcrumbs: BreadcrumbItem[] = [{ title: '首页', path: '/' }, { title: '物料管理' }]
 const demoUser: LoginUser = { userId: '1', username: 'admin', nickname: '平台管理员', roles: ['admin'], permissions: [] }
 const layoutCollapsed = ref(false)
+const portalWorkbenchTabId = '/portal'
+const activeLayoutTabId = ref('/sys/users')
+const layoutTabs = [
+  { id: '/sys/users', title: '用户管理', icon: User },
+  { id: '/sys/roles', title: '角色管理', icon: Lock },
+  { id: '/sys/dicts', title: '字典管理', icon: CollectionTag }
+]
+const standardLayoutBreadcrumbs = computed<BreadcrumbItem[]>(() => [
+  { title: '工作台', path: '/portal' },
+  { title: '系统管理', path: activeLayoutTabId.value }
+])
+const layoutPreviewState = computed(() => {
+  switch (activeLayoutTabId.value) {
+    case '/sys/roles':
+      return {
+        title: '角色管理',
+        description: '顶部 subheader 承载持久化 tab，角色页只负责当前 tab 的权限配置内容。',
+        actionText: '新增角色',
+        note: '切换到用户管理或字典管理后再回来，角色页的筛选条件、表格排序和编辑抽屉状态都可以继续保留。',
+        metrics: [
+          { label: '当前模块', value: '系统管理' },
+          { label: '打开 Tabs', value: '3' },
+          { label: '缓存策略', value: 'KeepAlive' }
+        ],
+        rows: [
+          { id: '1', code: 'ROLE-ADMIN', name: '平台管理员', status: 'DONE' },
+          { id: '2', code: 'ROLE-AUDIT', name: '安全审计员', status: 'PENDING' }
+        ]
+      }
+    case '/sys/dicts':
+      return {
+        title: '字典管理',
+        description: 'host 负责 tab 生命周期，业务页在当前 tab 下承载左右分栏或列表面板等具体内容。',
+        actionText: '新增类型',
+        note: '当字典管理切换到其他 tab 再返回时，当前选中的字典类型、搜索条件和展开面板状态都应可以恢复。',
+        metrics: [
+          { label: '当前模块', value: '系统管理' },
+          { label: '打开 Tabs', value: '3' },
+          { label: '持久化', value: 'localStorage' }
+        ],
+        rows: [
+          { id: '1', code: 'DICT-STATUS', name: '业务状态', status: 'DONE' },
+          { id: '2', code: 'DICT-MATERIAL', name: '物料类型', status: 'DONE' }
+        ]
+      }
+    default:
+      return {
+        title: '用户管理',
+        description: '左侧菜单、breadcrumb 和 tabs 由 host 统一组合，右侧只渲染当前 tab 的业务内容。',
+        actionText: '新增用户',
+        note: '切换到角色管理或字典管理再回来时，用户管理的查询条件、滚动位置和列表选中态仍可保持。',
+        metrics: [
+          { label: '当前模块', value: '系统管理' },
+          { label: '打开 Tabs', value: '3' },
+          { label: '当前激活', value: '用户管理' }
+        ],
+        rows: [
+          { id: '1', code: 'USER-001', name: '平台管理员', status: 'DONE' },
+          { id: '2', code: 'USER-002', name: '仓储主管', status: 'PENDING' }
+        ]
+      }
+  }
+})
 
 const riskState: LoginRiskState = {
   failureCount: 3,
@@ -328,8 +472,267 @@ const chatBiSql = 'select material_name, count(*) apply_count from mes_material_
 const agentSteps: AgentStep[] = [{ id: 's1', title: '理解问题', status: 'success' }, { id: 's2', title: '调用工具', status: 'running' }]
 const toolCalls: ToolCallRecord[] = [{ id: 't1', toolName: 'query_inventory_rank', serverName: 'mcp-business', status: 'success', durationMs: 86 }]
 
+function setLayoutPreviewPath(path: string): void {
+  if (layoutTabs.some((tab) => tab.id === path)) {
+    activeLayoutTabId.value = path
+  }
+}
+
+function handleLayoutTabChange(name: string | number): void {
+  setLayoutPreviewPath(String(name))
+}
+
+function handleLayoutPreviewMenuClick(menu: NavMenuItem): void {
+  setLayoutPreviewPath(menu.path)
+}
+
 function componentPath(componentName: string): string {
   const item = componentCatalog.find((component) => component.name === componentName)
   return item?.docsPath ?? '/component/overview'
 }
 </script>
+
+<style scoped>
+.sw-component-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: #0f172a;
+}
+
+.sw-component-detail__hero {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 32px;
+  border: 1px solid #dbeafe;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgb(37 99 235 / 12%), transparent 28%),
+    linear-gradient(135deg, #f8fbff 0%, #f7fee7 100%);
+  box-shadow: 0 18px 40px rgb(15 23 42 / 8%);
+}
+
+.sw-component-detail__hero h1,
+.sw-component-detail__hero p,
+.sw-component-detail__code-note,
+.sw-component-detail ul {
+  margin: 0;
+}
+
+.sw-component-detail__hero p,
+.sw-component-detail__code-note,
+.sw-component-detail ul {
+  color: #475569;
+  line-height: 1.7;
+}
+
+.sw-component-detail__tags,
+.sw-component-detail__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sw-component-detail__links a {
+  padding: 8px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sw-doc-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+  overflow: hidden;
+}
+
+.sw-doc-preview--layout {
+  padding: 0;
+  background: #dbe4f0;
+}
+
+.sw-doc-preview--layout :deep(.sw-layout) {
+  height: 720px;
+  min-height: 720px;
+}
+
+.sw-doc-preview--layout :deep(.sw-platform-page__body) {
+  overflow: hidden;
+}
+
+.sw-doc-tabs-shell {
+  padding-top: 8px;
+}
+
+.sw-doc-tabs :deep(.el-tabs__header) {
+  margin: 0;
+}
+
+.sw-doc-tabs :deep(.el-tabs__nav-wrap) {
+  padding-inline: 12px;
+}
+
+.sw-doc-tabs :deep(.el-tabs__item) {
+  height: 40px;
+  padding-inline: 18px;
+}
+
+.sw-doc-tabs__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.sw-doc-tabs__icon {
+  font-size: 14px;
+}
+
+.sw-doc-layout-shell {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.sw-doc-layout-body {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sw-doc-layout-note {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  color: #1e3a8a;
+  background:
+    linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+}
+
+.sw-doc-layout-note strong {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.sw-doc-layout-note span {
+  color: #334155;
+  line-height: 1.6;
+}
+
+.sw-doc-summary-grid,
+.sw-demo-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.sw-doc-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.sw-demo-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.sw-doc-summary-card,
+.sw-demo-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+  box-shadow: 0 12px 28px rgb(15 23 42 / 6%);
+}
+
+.sw-doc-summary-card {
+  padding: 16px;
+}
+
+.sw-doc-summary-card span {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.sw-doc-summary-card strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 22px;
+  color: #0f172a;
+}
+
+.sw-demo-panel {
+  padding: 18px;
+}
+
+.sw-demo-panel__eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.sw-demo-panel strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.sw-demo-panel p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.65;
+}
+
+.sw-code-block {
+  margin: 0;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: #0f172a;
+  color: #e2e8f0;
+  overflow: auto;
+}
+
+.sw-component-detail ul {
+  padding-left: 20px;
+}
+
+@media (max-width: 960px) {
+  .sw-component-detail__hero,
+  .sw-doc-preview {
+    padding: 20px;
+  }
+
+  .sw-doc-preview--layout {
+    padding: 0;
+  }
+
+  .sw-doc-preview--layout :deep(.sw-layout) {
+    height: 760px;
+    min-height: 760px;
+  }
+
+  .sw-doc-layout-note {
+    flex-direction: column;
+  }
+}
+</style>

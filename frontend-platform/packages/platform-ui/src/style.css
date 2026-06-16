@@ -222,6 +222,13 @@
   background: var(--sw-bg-panel);
 }
 
+.sw-layout__subheader {
+  flex-shrink: 0;
+  min-height: 0;
+  border-bottom: 1px solid var(--sw-border-color);
+  background: color-mix(in srgb, var(--sw-bg-panel) 96%, white 4%);
+}
+
 .sw-layout__header-left,
 .sw-layout__header-actions {
   display: flex;
@@ -953,14 +960,24 @@
   }
 
   .sw-layout__aside {
+    height: auto;
     min-height: 0;
+    max-height: min(42dvh, 320px);
+    flex: 0 0 auto;
     width: 100%;
     border-right: 0;
     border-bottom: 1px solid var(--sw-border-color);
+    overflow: hidden;
   }
 
   .sw-layout__aside-menu {
     min-height: 0;
+  }
+
+  .sw-layout__main {
+    height: auto;
+    min-height: 0;
+    flex: 1 1 auto;
   }
 
   .sw-layout__brand-text,

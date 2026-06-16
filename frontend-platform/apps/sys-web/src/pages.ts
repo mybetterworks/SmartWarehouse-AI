@@ -11,14 +11,16 @@ export const validSysRoutes = [
   '/sys/risk-records'
 ] as const
 
+export type ValidSysRoute = (typeof validSysRoutes)[number]
+
 export const sysRouteAliases: Record<string, (typeof validSysRoutes)[number]> = {
   '/sys/audit': '/sys/login-logs'
 }
 
-export function normalizeSysRoute(path?: string | null): (typeof validSysRoutes)[number] {
+export function normalizeSysRoute(path?: string | null): ValidSysRoute {
   if (!path) {
     return '/sys/users'
   }
   const normalized = sysRouteAliases[path] ?? path
-  return validSysRoutes.includes(normalized as (typeof validSysRoutes)[number]) ? (normalized as (typeof validSysRoutes)[number]) : '/sys/users'
+  return validSysRoutes.includes(normalized as ValidSysRoute) ? (normalized as ValidSysRoute) : '/sys/users'
 }

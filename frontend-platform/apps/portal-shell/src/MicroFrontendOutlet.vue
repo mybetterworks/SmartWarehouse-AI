@@ -5,9 +5,20 @@
       <p>正在加载 {{ module.moduleName }} 微前端...</p>
     </div>
 
-    <component v-else-if="remoteComponent" :is="remoteComponent" :route-path="routePath" :hosted="true" />
+    <component
+      v-else-if="remoteComponent"
+      :is="remoteComponent"
+      :route-path="routePath"
+      :route-full-path="routeFullPath"
+      :hosted="true"
+      @route-change="emit('routeChange', $event)"
+    />
 
-    <PlatformPage v-else title="微前端模块加载失败" :description="`${module.moduleName} 暂时不可用，门户和其他模块不会受到影响。`">
+    <PlatformPage
+      v-else
+      title="微前端模块加载失败"
+      :description="`${module.moduleName} 暂时不可用，门户和其他模块不会受到影响。`"
+    >
       <template #toolbar>
         <el-button @click="emit('back')">返回总控制台</el-button>
         <el-button type="primary" @click="loadRemote">重新加载</el-button>
@@ -28,22 +39,24 @@
 <script setup lang="ts">
 import { PlatformPage } from '@smartwarehouse/platform-ui'
 import type { Component } from 'vue'
-import { onMounted, ref, watch } from 'vue'
+import { markRaw, onMounted, ref, shallowRef, watch } from 'vue'
 import { loadRemoteComponent, type MicroFrontendModule } from './microFrontend'
 
 const props = defineProps<{
   module: MicroFrontendModule
   routePath: string
+  routeFullPath: string
 }>()
 
 const emit = defineEmits<{
   back: []
   retry: []
+  routeChange: [{ fullPath: string; mode?: 'push' | 'replace' }]
 }>()
 
 const loading = ref(false)
 const errorText = ref('')
-const remoteComponent = ref<Component>()
+const remoteComponent = shallowRef<Component>()
 const remoteLoadTimeoutMs = 8000
 
 onMounted(loadRemote)
@@ -58,8 +71,7 @@ async function loadRemote(): Promise<void> {
   errorText.value = ''
   remoteComponent.value = undefined
   try {
-    // 运行时从模块注册信息加载远程组件，避免乙方模块更新时重新构建 portal-shell。
-    remoteComponent.value = await withTimeout(loadRemoteComponent(props.module), remoteLoadTimeoutMs)
+    remoteComponent.value = markRaw(await withTimeout(loadRemoteComponent(props.module), remoteLoadTimeoutMs))
   } catch (error) {
     errorText.value = error instanceof Error ? error.message : String(error)
     emit('retry')
@@ -69,7 +81,6 @@ async function loadRemote(): Promise<void> {
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  // 远程入口网络异常时浏览器可能等待较久，门户需要主动超时并显示模块级降级页。
   return new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => {
       reject(new Error(`远程模块加载超时，请检查 remoteEntry 是否可访问：${props.module.remoteEntry}`))

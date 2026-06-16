@@ -20,7 +20,7 @@ import {
   type UserForm,
   type UserView
 } from './api'
-import { normalizeSysRoute } from './pages'
+import { normalizeSysRoute, type ValidSysRoute } from './pages'
 
 export function createEmptyState(): SysPageState {
   return {
@@ -40,7 +40,7 @@ export function createEmptyState(): SysPageState {
 
 export function useSysManagement() {
   const loading = ref(false)
-  const activeRoute = ref(normalizeSysRoute(resolveSysPathFromLocation()))
+  const activeRoute = ref(resolveActiveRoute(resolveSysLocationFromLocation()))
   const activeDictCode = ref('')
   const state = reactive<SysPageState>(createEmptyState())
   const profileDialogVisible = ref(false)
@@ -216,8 +216,12 @@ export function useSysManagement() {
     state.dictItems = activeDictCode.value ? await sysApi.dictItems(activeDictCode.value) : []
   }
 
-  function syncRoute(path: string): void {
-    activeRoute.value = normalizeSysRoute(path)
+  function syncRoute(pathOrFullPath: string): void {
+    const route = parseSysLocation(pathOrFullPath)
+    activeRoute.value = route.path
+    if (route.path === '/sys/dicts') {
+      activeDictCode.value = route.dictCode
+    }
   }
 
   function resolveSysMenus(allMenus: MenuItem[]): NavMenuItem[] {
@@ -623,15 +627,19 @@ export function hasSysManagementAccess(currentUser: LoginUser): boolean {
 }
 
 export function resolveSysPathFromLocation(): string {
+  return parseSysLocation(resolveSysLocationFromLocation()).path
+}
+
+export function resolveSysLocationFromLocation(): string {
   const pathname = window.location.pathname
   const redirectPath = new URLSearchParams(window.location.search).get('redirect')
   if (pathname === '/sys' || pathname.startsWith('/sys/')) {
-    return pathname
+    return `${pathname}${window.location.search}${window.location.hash}`
   }
   const basePath = normalizeBasePath(import.meta.env.BASE_URL)
   if (basePath !== '/' && (pathname === basePath || pathname.startsWith(`${basePath}/`))) {
     const nestedPath = pathname.slice(basePath.length)
-    return nestedPath && nestedPath !== '/' ? nestedPath : redirectPath ?? '/sys/users'
+    return nestedPath && nestedPath !== '/' ? `${nestedPath}${window.location.search}${window.location.hash}` : redirectPath ?? '/sys/users'
   }
   return redirectPath ?? '/sys/users'
 }
@@ -639,4 +647,16 @@ export function resolveSysPathFromLocation(): string {
 function normalizeBasePath(baseUrl: string): string {
   const normalized = `/${baseUrl.replace(/^\/+|\/+$/g, '')}`
   return normalized === '/' ? '/' : normalized
+}
+
+function resolveActiveRoute(pathOrFullPath: string): ValidSysRoute {
+  return parseSysLocation(pathOrFullPath).path
+}
+
+function parseSysLocation(pathOrFullPath: string): { path: ValidSysRoute; dictCode: string } {
+  const url = new URL(pathOrFullPath || '/sys/users', window.location.origin)
+  return {
+    path: normalizeSysRoute(url.pathname),
+    dictCode: url.searchParams.get('dictCode') ?? ''
+  }
 }

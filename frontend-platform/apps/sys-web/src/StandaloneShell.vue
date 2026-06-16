@@ -70,7 +70,7 @@ import type { BreadcrumbItem, LoginUser, MenuItem, NavMenuItem } from '@smartwar
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import SysContentView from './SysContentView.vue'
 import SysManagementDialogs from './SysManagementDialogs.vue'
-import { resolveSysPathFromLocation, useSysManagement } from './useSysManagement'
+import { resolveSysLocationFromLocation, useSysManagement } from './useSysManagement'
 
 const props = defineProps<{
   user: LoginUser
@@ -90,7 +90,7 @@ const standaloneMenus = computed<NavMenuItem[]>(() => {
 })
 
 onMounted(async () => {
-  sys.syncRoute(resolveSysPathFromLocation())
+  sys.syncRoute(resolveSysLocationFromLocation())
   await sys.loadAll()
   window.addEventListener('popstate', syncCurrentRoute)
 })
@@ -114,7 +114,7 @@ function handleBreadcrumbClick(item: BreadcrumbItem): void {
 }
 
 function syncCurrentRoute(): void {
-  sys.syncRoute(resolveSysPathFromLocation())
+  sys.syncRoute(resolveSysLocationFromLocation())
 }
 
 function writeActiveRouteToLocation(path: string): void {

@@ -1,6 +1,6 @@
 # 决策记录目录
 
-本目录用于记录 SmartWarehouse-AI 开发过程中的业务决策、技术决策、建议修改和用户确认结果。
+本目录用于记录 SmartWarehouse-AI 在开发过程中的架构决策、技术决策、边界调整和用户确认结果。
 
 ## 1. 文件命名
 
@@ -31,7 +31,6 @@ SUPERSEDED 已被新决策替代
 # 0000 决策标题
 
 ## 状态
-
 PROPOSED
 
 ## 背景
@@ -63,7 +62,7 @@ PROPOSED
 | 编号 | 决策 | 状态 |
 |---|---|---|
 | 0001 | `docs/design` 扁平存储，`docs/plan` 存提示词系统 | ACCEPTED |
-| 0002 | 甲方/乙方独立项目边界 | ACCEPTED |
+| 0002 | 甲方 / 乙方独立项目边界 | ACCEPTED |
 | 0003 | 8 个敏捷版本拆分 | ACCEPTED |
 | 0004 | 组件文档站与 Playground 四层结构 | SUPERSEDED |
 | 0005 | 企业组件库文档站两模块结构 | SUPERSEDED |
@@ -72,4 +71,5 @@ PROPOSED
 | 0008 | 删除预设式静态 Playground，保留组件与场景模板两入口 | ACCEPTED |
 | 0009 | 门户统一前端路由入口，子项目 embedded/route 接入 | SUPERSEDED |
 | 0010 | vite-plugin-federation 运行时微前端架构 | ACCEPTED |
-| 0011 | 门户壳层归 host，sys remote 只负责托管内容区 | ACCEPTED |
+| 0011 | 门户壳层作为 host，sys remote 只负责托管内容区 | ACCEPTED |
+| 0012 | 门户壳层持久化 Tab 与 hosted 路由协定 | ACCEPTED |

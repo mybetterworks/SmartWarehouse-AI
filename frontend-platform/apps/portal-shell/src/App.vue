@@ -35,145 +35,45 @@
     @logout="handleLogout"
     @user-command="handleUserCommand"
     @menu-click="handleMenuClick"
-    @workbench-click="navigateTo('/portal')"
+    @workbench-click="activateRoute('/portal')"
     @breadcrumb-click="handleBreadcrumbClick"
     @module-select="handleModuleSelect"
   >
-    <PlatformPage
-      v-if="isPortalRoute"
-      title="平台工作台"
-      description="查看个人信息、消息、常用模块、最近访问和登录记录。"
-    >
-      <template #toolbar>
-        <el-button type="primary" :loading="workbenchLoading" @click="reloadWorkbench">刷新工作台</el-button>
-      </template>
-
-      <section class="portal-workbench">
-        <article class="portal-card portal-card--hero">
-          <div>
-            <p class="portal-card__eyebrow">Profile</p>
-            <h2>{{ workbench?.profile.nickname || user?.nickname || user?.username }}</h2>
-            <p>账号：{{ workbench?.profile.username || user?.username }}</p>
-            <p>角色：{{ (workbench?.profile.roles || user?.roles || []).join(', ') || '-' }}</p>
-            <p>最近登录：{{ formatDateTime(workbench?.profile.lastLoginTime) }} / {{ workbench?.profile.lastLoginIp || '-' }}</p>
-          </div>
-          <div class="portal-card__pill-list">
-            <span v-for="role in workbench?.profile.roles || []" :key="role" class="portal-pill">{{ role }}</span>
-          </div>
-        </article>
-
-        <article class="portal-card">
-          <header class="portal-card__header">
-            <div>
-              <p class="portal-card__eyebrow">Notices</p>
-              <h3>消息列表</h3>
-            </div>
-          </header>
-          <ul class="portal-list">
-            <li v-for="notice in workbench?.notices || []" :key="notice.id" class="portal-list__item">
-              <div>
-                <strong>{{ notice.title }}</strong>
-                <p>{{ notice.content }}</p>
-              </div>
-              <span class="portal-list__meta">{{ notice.level }}</span>
-            </li>
-            <li v-if="!(workbench?.notices?.length)" class="portal-list__item portal-list__item--empty">暂无消息</li>
-          </ul>
-        </article>
-
-        <article class="portal-card">
-          <header class="portal-card__header">
-            <div>
-              <p class="portal-card__eyebrow">Common</p>
-              <h3>常用模块</h3>
-            </div>
-          </header>
-          <div class="portal-module-grid">
-            <button
-              v-for="module in workbench?.commonModules || []"
-              :key="`common-${module.moduleCode}`"
-              type="button"
-              class="portal-module-card"
-              @click="openModule(module)"
-            >
-              <span>{{ module.moduleCode.toUpperCase() }}</span>
-              <strong>{{ module.moduleName }}</strong>
-              <small>{{ module.routePrefix }}</small>
-            </button>
-            <div v-if="!(workbench?.commonModules?.length)" class="portal-module-empty">暂无常用模块</div>
-          </div>
-        </article>
-
-        <article class="portal-card">
-          <header class="portal-card__header">
-            <div>
-              <p class="portal-card__eyebrow">Recent</p>
-              <h3>最近访问</h3>
-            </div>
-          </header>
-          <div class="portal-module-grid">
-            <button
-              v-for="module in workbench?.recentModules || []"
-              :key="`recent-${module.moduleCode}`"
-              type="button"
-              class="portal-module-card portal-module-card--soft"
-              @click="openModule(module)"
-            >
-              <span>{{ module.moduleCode.toUpperCase() }}</span>
-              <strong>{{ module.moduleName }}</strong>
-              <small>{{ module.routePrefix }}</small>
-            </button>
-            <div v-if="!(workbench?.recentModules?.length)" class="portal-module-empty">暂无最近访问</div>
-          </div>
-        </article>
-
-        <article class="portal-card">
-          <header class="portal-card__header">
-            <div>
-              <p class="portal-card__eyebrow">Security</p>
-              <h3>登录记录</h3>
-            </div>
-          </header>
-          <ul class="portal-list">
-            <li v-for="item in workbench?.loginRecords || []" :key="String(item.id || item.loginTime)" class="portal-list__item">
-              <div>
-                <strong>{{ String(item.username || '-') }}</strong>
-                <p>{{ String(item.loginIp || '-') }} / {{ String(item.loginStatus || '-') }}</p>
-              </div>
-              <span class="portal-list__meta">{{ formatDateTime(String(item.loginTime || '')) }}</span>
-            </li>
-            <li v-if="!(workbench?.loginRecords?.length)" class="portal-list__item portal-list__item--empty">暂无登录记录</li>
-          </ul>
-        </article>
+    <template #subheader>
+      <section class="portal-tabs-shell">
+        <el-tabs class="portal-tabs" type="card" closable :model-value="activeTabId" @tab-change="handleTabChange" @tab-remove="handleTabRemove">
+          <el-tab-pane v-for="tab in tabs" :key="tab.id" :name="tab.id" :closable="tab.closable">
+            <template #label>
+              <span class="portal-tabs__label">
+                <el-icon class="portal-tabs__icon">
+                  <component :is="tab.icon ? resolvePortalIcon(tab.icon) : resolveFallbackTabIcon(tab.moduleCode, tab.id)" />
+                </el-icon>
+                <span class="portal-tabs__text">{{ tab.title }}</span>
+              </span>
+            </template>
+          </el-tab-pane>
+        </el-tabs>
       </section>
-    </PlatformPage>
+    </template>
 
-    <MicroFrontendOutlet
-      v-else-if="activeMicroModule"
-      :key="`${activeMicroModule.remoteName}:${activeMicroModule.remoteEntry}:${currentPath}`"
-      :module="activeMicroModule"
-      :route-path="currentPath"
-      @back="navigateTo('/portal')"
-      @retry="reloadPortal"
-    />
-
-    <PlatformPage
-      v-else-if="activeModule"
-      :title="activeModule.moduleName"
-      :description="`${activeModule.routePrefix} 当前未接入 remote，先展示宿主降级页。`"
-    >
-      <section class="portal-module-placeholder">
-        <h2>{{ activeModule.moduleName }} 暂未接入</h2>
-        <p>当前模块还没有提供可加载的 remote 内容，门户壳层和导航保持可用。</p>
-        <p>模块路由：{{ activeModule.routePrefix }}</p>
-      </section>
-    </PlatformPage>
-
-    <PlatformPage v-else title="模块未授权或未配置" description="当前路由没有匹配到已授权模块，请返回工作台或检查模块注册。">
-      <template #toolbar>
-        <el-button type="primary" @click="navigateTo('/portal')">返回工作台</el-button>
-      </template>
-    </PlatformPage>
+    <section class="portal-tab-view">
+      <KeepAlive :max="maxCachedTabs">
+        <PortalTabPane
+          v-if="activeTab"
+          :key="activeTab.id"
+          :tab="activeTab"
+          :modules="modules"
+          :user="user"
+          :workbench="workbench"
+          :workbench-loading="workbenchLoading"
+          @open-module="openModule"
+          @navigate="activateRoute($event)"
+          @retry="reloadPortal"
+          @reload-workbench="reloadWorkbench"
+          @route-change="handleHostedRouteChange"
+        />
+      </KeepAlive>
+    </section>
   </PlatformLayout>
 
   <el-dialog v-model="profileDialogVisible" title="个人信息" width="520px">
@@ -206,7 +106,7 @@
 
 <script setup lang="ts">
 import { ApiError } from '@smartwarehouse/platform-sdk'
-import { LoginForm, PlatformLayout, PlatformPage } from '@smartwarehouse/platform-ui'
+import { LoginForm, PlatformLayout } from '@smartwarehouse/platform-ui'
 import type {
   BreadcrumbItem,
   FrontendModule,
@@ -230,11 +130,17 @@ import {
   login,
   logout,
   recordPortalAccess,
-  type CaptchaChallenge,
-  verifyCaptcha
+  verifyCaptcha,
+  type CaptchaChallenge
 } from './api'
-import MicroFrontendOutlet from './MicroFrontendOutlet.vue'
-import { isMicroFrontendModule, toMicroFrontendModule } from './microFrontend'
+import PortalTabPane, { type PortalTabRouteChangePayload } from './PortalTabPane.vue'
+import { createWorkbenchTab, loadPortalTabSnapshot, savePortalTabSnapshot, type PortalTabRecord, WORKBENCH_TAB_ID } from './portalTabs'
+import { extractPortalPath, getBrowserFullPath, isRouteInModule, normalizePortalFullPath, normalizePortalPath, resolveModuleRoute } from './routeUtils'
+import { resolveFallbackTabIcon, resolvePortalIcon } from './tabIcons'
+
+type HistoryMode = 'push' | 'replace' | 'none'
+
+const maxCachedTabs = 8
 
 const user = ref<LoginUser>()
 const menus = ref<MenuItem[]>([])
@@ -251,24 +157,24 @@ const profileDialogVisible = ref(false)
 const passwordDialogVisible = ref(false)
 const passwordSubmitting = ref(false)
 const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
-const currentPath = ref(normalizeBrowserPath(window.location.pathname))
+const currentFullPath = ref(getBrowserFullPath())
+const tabs = ref<PortalTabRecord[]>([createWorkbenchTab()])
+const activeTabId = ref(WORKBENCH_TAB_ID)
 const lastTrackedModuleCode = ref('')
+const tabsReady = ref(false)
 
-const isPortalRoute = computed(() => currentPath.value === '/portal')
+const currentPath = computed(() => extractPortalPath(currentFullPath.value))
+const storageKey = computed(() => (user.value ? `sw.portal.tabs:${user.value.userId}` : ''))
+const isPortalRoute = computed(() => currentPath.value === WORKBENCH_TAB_ID)
+const activeTab = computed(() => tabs.value.find((tab) => tab.id === activeTabId.value) ?? tabs.value[0])
 const activeModule = computed(() => modules.value.find((module) => isRouteInModule(currentPath.value, module)))
-const activeMicroModule = computed(() => {
-  if (!activeModule.value || !isMicroFrontendModule(activeModule.value)) {
-    return undefined
-  }
-  return toMicroFrontendModule(activeModule.value)
-})
+const navMenus = computed(() => menus.value.map(toNavMenu))
+const flatNavMenus = computed(() => flattenMenus(navMenus.value))
 const activeNavMenus = computed<NavMenuItem[]>(() => {
   if (!activeModule.value) {
     return []
   }
-  const moduleMenus = menus.value
-    .filter((menu) => menu.moduleCode === activeModule.value?.moduleCode)
-    .map(toNavMenu)
+  const moduleMenus = navMenus.value.filter((menu) => menu.moduleCode === activeModule.value?.moduleCode)
   return unwrapModuleRootMenus(moduleMenus, activeModule.value.routePrefix || `/${activeModule.value.moduleCode}`)
 })
 const breadcrumbs = computed<BreadcrumbItem[]>(() => {
@@ -288,10 +194,7 @@ onMounted(async () => {
   window.addEventListener('popstate', syncCurrentPath)
   try {
     user.value = await loadMe()
-    await reloadPortal()
-    if (window.location.pathname === '/') {
-      replaceRoute('/portal')
-    }
+    await initializeAuthenticatedShell()
   } catch {
     user.value = undefined
     riskState.value = await loadRiskState(lastUsername.value)
@@ -301,6 +204,17 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('popstate', syncCurrentPath)
 })
+
+watch(
+  [tabs, activeTabId, storageKey],
+  ([nextTabs, nextActiveTabId, nextStorageKey]) => {
+    if (!nextStorageKey || !tabsReady.value) {
+      return
+    }
+    savePortalTabSnapshot(nextStorageKey, nextTabs, nextActiveTabId)
+  },
+  { deep: true }
+)
 
 watch(
   () => activeModule.value?.moduleCode,
@@ -314,6 +228,19 @@ watch(
   }
 )
 
+async function initializeAuthenticatedShell(): Promise<void> {
+  const restoredSnapshot = storageKey.value ? loadPortalTabSnapshot(storageKey.value) : undefined
+  tabsReady.value = false
+  await reloadPortal()
+  currentFullPath.value = window.location.pathname === '/' ? '/portal' : getBrowserFullPath()
+  if (window.location.pathname === '/') {
+    updateBrowserHistory(currentFullPath.value, 'replace')
+  }
+  restoreTabsFromStorage(restoredSnapshot)
+  tabsReady.value = true
+  persistPortalTabs()
+}
+
 async function handleLogin(model: LoginFormModel): Promise<void> {
   loginLoading.value = true
   loginError.value = ''
@@ -326,8 +253,7 @@ async function handleLogin(model: LoginFormModel): Promise<void> {
       captchaVerifyToken: model.captchaToken
     })
     user.value = await loadMe()
-    await reloadPortal()
-    replaceRoute('/portal')
+    await initializeAuthenticatedShell()
     ElMessage.success('登录成功')
   } catch (error) {
     const apiError = error as ApiError
@@ -357,6 +283,12 @@ async function reloadPortal(): Promise<void> {
   const [nextMenus, nextModules] = await Promise.all([loadMenus(), loadModules()])
   menus.value = nextMenus
   modules.value = nextModules
+  tabs.value = reconcileTabs(tabs.value)
+  if (!tabs.value.some((tab) => tab.id === activeTabId.value)) {
+    activeTabId.value = WORKBENCH_TAB_ID
+    currentFullPath.value = WORKBENCH_TAB_ID
+    updateBrowserHistory(currentFullPath.value, 'replace')
+  }
   await reloadWorkbench()
 }
 
@@ -375,10 +307,13 @@ async function reloadWorkbench(): Promise<void> {
 
 async function handleLogout(): Promise<void> {
   await logout()
+  tabsReady.value = false
   user.value = undefined
   menus.value = []
   modules.value = []
   workbench.value = undefined
+  tabs.value = [createWorkbenchTab()]
+  activeTabId.value = WORKBENCH_TAB_ID
   lastTrackedModuleCode.value = ''
   riskState.value = await loadRiskState(lastUsername.value)
 }
@@ -407,86 +342,231 @@ async function submitPassword(): Promise<void> {
 }
 
 function handleMenuClick(menu: NavMenuItem): void {
-  navigateTo(menu.path)
+  activateRoute(menu.path)
 }
 
 function handleBreadcrumbClick(item: BreadcrumbItem): void {
   if (!item.path) {
     return
   }
-  navigateTo(item.path)
+  activateRoute(item.path)
 }
 
 function handleModuleSelect(module: FrontendModule): void {
   openModule(module)
 }
 
-function openModule(module: FrontendModule, targetPath?: string): void {
-  navigateTo(resolveModuleRoute(module, targetPath))
-}
-
-function resolveModuleRoute(module: FrontendModule, targetPath?: string): string {
-  const moduleRoot = normalizeInternalRoute(module.routePrefix || `/${module.moduleCode}`)
-  if (targetPath) {
-    const normalizedTarget = normalizeInternalRoute(targetPath)
-    if (normalizedTarget !== moduleRoot) {
-      return normalizedTarget
-    }
-  }
-  if (module.moduleCode === 'sys') {
-    return '/sys/users'
-  }
-  return moduleRoot
-}
-
-function navigateTo(path: string): void {
-  const nextPath = normalizeInternalRoute(path)
-  if (currentPath.value === nextPath && window.location.pathname === nextPath) {
+function handleTabChange(name: string | number): void {
+  const nextTabId = String(name)
+  const nextTab = tabs.value.find((tab) => tab.id === nextTabId)
+  if (!nextTab) {
     return
   }
-  window.history.pushState(null, '', nextPath)
-  currentPath.value = nextPath
+  activeTabId.value = nextTab.id
+  currentFullPath.value = nextTab.fullPath
+  updateBrowserHistory(nextTab.fullPath, 'push')
 }
 
-function replaceRoute(path: string): void {
-  const nextPath = normalizeInternalRoute(path)
-  window.history.replaceState(null, '', nextPath)
-  currentPath.value = nextPath
+function handleTabRemove(name: string | number): void {
+  closeTab(String(name))
+}
+
+function handleHostedRouteChange(payload: PortalTabRouteChangePayload): void {
+  const normalizedFullPath = normalizePortalFullPath(payload.fullPath)
+  const nextTabId = extractPortalPath(normalizedFullPath)
+  if (nextTabId === activeTabId.value) {
+    activateRoute(normalizedFullPath, { historyMode: payload.mode ?? 'replace', preferIncomingFullPath: true })
+    return
+  }
+  const previousActiveTab = activeTab.value
+  if (previousActiveTab?.closable) {
+    tabs.value = tabs.value.filter((tab) => tab.id !== previousActiveTab.id)
+  }
+  activateRoute(normalizedFullPath, { historyMode: payload.mode ?? 'replace', preferIncomingFullPath: true })
+}
+
+function openModule(module: FrontendModule, targetPath?: string): void {
+  activateRoute(resolveModuleRoute(module, targetPath))
+}
+
+function activateRoute(
+  target: string,
+  options: {
+    historyMode?: HistoryMode
+    preferIncomingFullPath?: boolean
+  } = {}
+): void {
+  const incomingFullPath = normalizePortalFullPath(target)
+  const tabId = extractPortalPath(incomingFullPath)
+  const existingIndex = tabs.value.findIndex((tab) => tab.id === tabId)
+
+  let nextTab: PortalTabRecord
+  if (existingIndex >= 0) {
+    if (options.preferIncomingFullPath) {
+      nextTab = buildTabRecord(incomingFullPath)
+      tabs.value.splice(existingIndex, 1, nextTab)
+    } else {
+      nextTab = tabs.value[existingIndex]
+    }
+  } else {
+    nextTab = upsertTab(incomingFullPath)
+  }
+
+  activeTabId.value = nextTab.id
+  currentFullPath.value = nextTab.fullPath
+  updateBrowserHistory(nextTab.fullPath, options.historyMode ?? 'push')
+}
+
+function closeTab(tabId: string): void {
+  const index = tabs.value.findIndex((tab) => tab.id === tabId)
+  if (index < 0 || !tabs.value[index].closable) {
+    return
+  }
+
+  const isClosingActiveTab = activeTabId.value === tabId
+  tabs.value.splice(index, 1)
+
+  if (!isClosingActiveTab) {
+    return
+  }
+
+  const nextTab = tabs.value[index - 1] ?? tabs.value[index] ?? tabs.value[0] ?? createWorkbenchTab()
+  activeTabId.value = nextTab.id
+  currentFullPath.value = nextTab.fullPath
+  updateBrowserHistory(nextTab.fullPath, 'replace')
+}
+
+function restoreTabsFromStorage(snapshot = storageKey.value ? loadPortalTabSnapshot(storageKey.value) : undefined): void {
+  tabs.value = reconcileTabs(snapshot?.tabs ?? [])
+  activeTabId.value = WORKBENCH_TAB_ID
+  activateRoute(currentFullPath.value, { historyMode: 'none', preferIncomingFullPath: true })
+}
+
+function persistPortalTabs(): void {
+  if (!storageKey.value || !tabsReady.value) {
+    return
+  }
+  savePortalTabSnapshot(storageKey.value, tabs.value, activeTabId.value)
 }
 
 function syncCurrentPath(): void {
-  currentPath.value = normalizeBrowserPath(window.location.pathname)
-}
-
-function normalizeBrowserPath(path: string): string {
-  return normalizeInternalRoute(path === '/' ? '/portal' : path)
-}
-
-function normalizeInternalRoute(path: string): string {
-  if (!path || path === '/') {
-    return '/portal'
+  currentFullPath.value = getBrowserFullPath()
+  if (!user.value) {
+    return
   }
-  const normalized = path.startsWith('/') ? path : `/${path}`
-  return normalized.replace(/\/+$/, '') || '/portal'
+  activateRoute(currentFullPath.value, { historyMode: 'none', preferIncomingFullPath: true })
 }
 
-function isRouteInModule(path: string, module: FrontendModule): boolean {
-  const prefix = normalizeInternalRoute(module.routePrefix || `/${module.moduleCode}`)
-  return path === prefix || path.startsWith(`${prefix}/`)
+function updateBrowserHistory(fullPath: string, mode: HistoryMode): void {
+  if (mode === 'none') {
+    return
+  }
+  const normalizedFullPath = normalizePortalFullPath(fullPath)
+  if (getBrowserFullPath() === normalizedFullPath) {
+    return
+  }
+  if (mode === 'replace') {
+    window.history.replaceState(null, '', normalizedFullPath)
+    return
+  }
+  window.history.pushState(null, '', normalizedFullPath)
+}
+
+function upsertTab(fullPath: string): PortalTabRecord {
+  const nextTab = buildTabRecord(fullPath)
+  const existingIndex = tabs.value.findIndex((tab) => tab.id === nextTab.id)
+  if (existingIndex >= 0) {
+    tabs.value.splice(existingIndex, 1, nextTab)
+    return nextTab
+  }
+  tabs.value = [...tabs.value, nextTab]
+  return nextTab
+}
+
+function reconcileTabs(candidates: PortalTabRecord[]): PortalTabRecord[] {
+  const normalizedTabs: PortalTabRecord[] = [createWorkbenchTab()]
+  const seen = new Set<string>([WORKBENCH_TAB_ID])
+
+  for (const candidate of candidates) {
+    const normalizedFullPath = normalizePortalFullPath(candidate.fullPath)
+    const tabId = extractPortalPath(normalizedFullPath)
+    if (seen.has(tabId)) {
+      continue
+    }
+    if (tabId !== WORKBENCH_TAB_ID && !findModuleForPath(tabId)) {
+      continue
+    }
+    normalizedTabs.push(buildTabRecord(normalizedFullPath))
+    seen.add(tabId)
+  }
+
+  return normalizedTabs
+}
+
+function buildTabRecord(fullPath: string): PortalTabRecord {
+  const normalizedFullPath = normalizePortalFullPath(fullPath)
+  const tabId = extractPortalPath(normalizedFullPath)
+
+  if (tabId === WORKBENCH_TAB_ID) {
+    return createWorkbenchTab()
+  }
+
+  const matchedMenu = findBestMenuMatch(tabId)
+  if (matchedMenu) {
+    return {
+      id: tabId,
+      fullPath: normalizedFullPath,
+      title: matchedMenu.title,
+      icon: matchedMenu.icon,
+      moduleCode: matchedMenu.moduleCode,
+      closable: true,
+      cacheable: true
+    }
+  }
+
+  const matchedModule = findModuleForPath(tabId)
+  if (matchedModule) {
+    return {
+      id: tabId,
+      fullPath: normalizedFullPath,
+      title: matchedModule.moduleName,
+      moduleCode: matchedModule.moduleCode,
+      closable: true,
+      cacheable: true
+    }
+  }
+
+  return {
+    id: tabId,
+    fullPath: normalizedFullPath,
+    title: '未授权页面',
+    icon: 'WarningFilled',
+    closable: true,
+    cacheable: false
+  }
+}
+
+function findModuleForPath(pathOrFullPath: string): FrontendModule | undefined {
+  return modules.value.find((module) => isRouteInModule(pathOrFullPath, module))
+}
+
+function findBestMenuMatch(path: string): NavMenuItem | undefined {
+  return [...flatNavMenus.value]
+    .sort((left, right) => normalizePortalPath(right.path).length - normalizePortalPath(left.path).length)
+    .find((menu) => {
+      const menuPath = normalizePortalPath(menu.path)
+      return path === menuPath || path.startsWith(`${menuPath}/`)
+    })
+}
+
+function flattenMenus(items: NavMenuItem[]): NavMenuItem[] {
+  return items.flatMap((item) => [item, ...flattenMenus(item.children ?? [])])
 }
 
 function resetPasswordForm(): void {
   passwordForm.oldPassword = ''
   passwordForm.newPassword = ''
   passwordForm.confirmPassword = ''
-}
-
-function formatDateTime(value?: string): string {
-  if (!value) {
-    return '-'
-  }
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
 }
 
 function toNavMenu(menu: MenuItem): NavMenuItem {
@@ -502,12 +582,12 @@ function toNavMenu(menu: MenuItem): NavMenuItem {
   }
 }
 
-function unwrapModuleRootMenus(menus: NavMenuItem[], moduleRootPath: string): NavMenuItem[] {
-  if (menus.length !== 1) {
-    return menus
+function unwrapModuleRootMenus(items: NavMenuItem[], moduleRootPath: string): NavMenuItem[] {
+  if (items.length !== 1) {
+    return items
   }
-  const normalizedRootPath = normalizeInternalRoute(moduleRootPath)
-  const [rootMenu] = menus
-  return normalizeInternalRoute(rootMenu.path) === normalizedRootPath && rootMenu.children?.length ? rootMenu.children : menus
+  const normalizedRootPath = normalizePortalPath(moduleRootPath)
+  const [rootMenu] = items
+  return normalizePortalPath(rootMenu.path) === normalizedRootPath && rootMenu.children?.length ? rootMenu.children : items
 }
 </script>

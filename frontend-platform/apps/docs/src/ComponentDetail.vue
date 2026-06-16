@@ -589,3 +589,40 @@ function appendMessage(value: string): void {
   prompt.value = ''
 }
 </script>
+
+<style scoped>
+.sw-doc-preview--layout {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sw-doc-preview--layout :deep(.sw-layout) {
+  height: 560px;
+  min-height: 560px;
+}
+
+.sw-doc-preview--layout :deep(.sw-layout__content) {
+  align-items: stretch;
+}
+
+.sw-doc-preview--layout :deep(.sw-layout__content > .sw-demo-panel) {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border-style: dashed;
+  box-sizing: border-box;
+}
+
+@media (max-width: 960px) {
+  .sw-doc-preview--layout :deep(.sw-layout) {
+    height: 500px;
+    min-height: 500px;
+  }
+}
+</style>

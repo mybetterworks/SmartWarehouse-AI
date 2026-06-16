@@ -5,6 +5,9 @@ import type {
   FormFieldSchema,
   ImportTask,
   MaterialRequirement,
+  PortalNotice as SharedPortalNotice,
+  PortalProfile as SharedPortalProfile,
+  PortalWorkbench as SharedPortalWorkbench,
   RankItem,
   StatCardItem,
   TableColumn,
@@ -21,6 +24,9 @@ export type PlatformRankItem = RankItem
 export type PlatformAlertItem = AlertItem
 export type PlatformImportTask = ImportTask
 export type PlatformMaterialRequirement = MaterialRequirement
+export type PortalNotice = SharedPortalNotice
+export type PortalProfile = SharedPortalProfile
+export type PortalWorkbench = SharedPortalWorkbench
 export type PlatformChatMessage = ChatMessage
 export type PlatformAgentStep = AgentStep
 export type PlatformToolCallRecord = ToolCallRecord

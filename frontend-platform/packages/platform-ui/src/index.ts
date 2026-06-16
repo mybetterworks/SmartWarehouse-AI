@@ -158,9 +158,12 @@ export type {
   PlatformImportTask,
   PlatformMaterialRequirement,
   PlatformRankItem,
-  PlatformStatCardItem,
   PlatformTableColumn,
   PlatformTablePagination,
+  PortalNotice,
+  PortalProfile,
+  PortalWorkbench,
+  PlatformStatCardItem,
   PlatformToolCallRecord
 } from './types'
 

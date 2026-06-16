@@ -1,0 +1,160 @@
+html,
+body {
+  height: 100%;
+}
+
+body,
+#app {
+  height: 100%;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f5f7fb;
+  color: #1f2a44;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.sys-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #eef3fb;
+}
+
+.sys-login__panel {
+  width: min(420px, calc(100vw - 40px));
+  padding: 28px;
+  border: 1px solid #dbe3f0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(31, 42, 68, 0.12);
+}
+
+.sys-login__panel h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+}
+
+.sys-login__panel p {
+  margin: 0 0 20px;
+  color: #6b7890;
+  line-height: 1.7;
+}
+
+.sys-login__error {
+  margin-top: 16px;
+}
+
+.sys-tabs {
+  --el-tabs-header-height: 44px;
+}
+
+.sys-action-bar {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.sys-hosted,
+.sys-route-panel {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.sys-hosted > * {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.sys-route-panel > * {
+  min-width: 0;
+}
+
+.sys-route-panel > .sys-action-bar {
+  min-height: auto;
+  flex: 0 0 auto;
+}
+
+.sys-route-panel > :last-child {
+  min-height: 0;
+  flex: 1;
+}
+
+.sys-route-panel > .sw-table,
+.sys-dict-detail__surface > .sw-table {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.sys-route-panel > .sw-table > .el-table,
+.sys-dict-detail__surface > .sw-table > .el-table {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  height: 100%;
+}
+
+.sys-route-panel > .sw-table > .sw-table__pagination,
+.sys-dict-detail__surface > .sw-table > .sw-table__pagination {
+  flex: 0 0 auto;
+}
+
+.sys-split {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sys-panel {
+  min-width: 0;
+}
+
+.sys-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sys-panel__header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sys-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sys-inline-actions .el-select {
+  width: 180px;
+}
+
+.sys-tag {
+  margin-right: 6px;
+}
+
+.sys-dialog-input {
+  margin-top: 16px;
+}
+
+@media (max-width: 1100px) {
+  .sys-split {
+    grid-template-columns: 1fr;
+  }
+}

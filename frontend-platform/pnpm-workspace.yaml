@@ -1,3 +1,6 @@
 packages:
   - "packages/*"
   - "apps/*"
+  - "../wms-web"
+  - "../mes-web"
+  - "../ai-web"

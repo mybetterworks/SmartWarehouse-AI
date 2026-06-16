@@ -1,0 +1,18 @@
+body {
+  margin: 0;
+  background: #f5f7fb;
+  color: #1f2a44;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.vendor-app {
+  min-height: 100vh;
+  background: #f5f7fb;
+}
+
+.vendor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}

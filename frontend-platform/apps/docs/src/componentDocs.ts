@@ -119,15 +119,37 @@ onMounted(() => {
 </template>`,
   'platform-layout': `<script setup lang="ts">
 import { PlatformLayout } from '@smartwarehouse/platform-ui'
-import type { BreadcrumbItem, LoginUser, NavMenuItem } from '@smartwarehouse/platform-types'
+import type { BreadcrumbItem, FrontendModule, LoginUser, NavMenuItem } from '@smartwarehouse/platform-types'
 
-const menus: NavMenuItem[] = [{ id: 'sys', title: '系统管理', path: '/sys', moduleCode: 'sys' }]
-const breadcrumbs: BreadcrumbItem[] = [{ title: '平台' }, { title: '组件库' }]
+const menus: NavMenuItem[] = [{ id: 'sys-users', title: '用户管理', path: '/sys/users', moduleCode: 'sys' }]
+const breadcrumbs: BreadcrumbItem[] = [{ title: '工作台', path: '/portal' }, { title: '系统管理', path: '/sys/users' }]
+const modules: FrontendModule[] = [
+  {
+    moduleCode: 'sys',
+    moduleName: '系统管理',
+    routePrefix: '/sys',
+    entryUrl: 'http://localhost:5175',
+    apiPrefix: '/api/sys',
+    ownerType: 'OWNER'
+  }
+]
 const user: LoginUser = { userId: '1', username: 'admin', nickname: '平台管理员', roles: ['admin'], permissions: [] }
 </script>
 
 <template>
-  <PlatformLayout title="SmartWarehouse-AI" :menus="menus" :breadcrumbs="breadcrumbs" :user="user">
+  <PlatformLayout
+    title="SW-AI"
+    brand-abbr="SW-AI"
+    :menus="menus"
+    :breadcrumbs="breadcrumbs"
+    :user="user"
+    :module-entries="modules"
+    active-module-code="sys"
+    show-workbench-button
+    show-module-drawer-trigger
+    @workbench-click="console.log('workbench')"
+    @module-select="console.log($event)"
+  >
     <div>页面内容</div>
   </PlatformLayout>
 </template>`,
@@ -409,15 +431,31 @@ import type { LoginFormModel, LoginRiskState } from '@smartwarehouse/platform-ty
 
 const riskState: LoginRiskState = { failureCount: 3, captchaRequired: true, message: '连续失败 3 次后启用随机拼图验证码' }
 
+async function verifyCaptcha(x: number): Promise<string> {
+  console.log('slider x:', x)
+  return 'captcha-verify-token'
+}
+
 function login(model: LoginFormModel): void {
   console.log(model.username)
 }
 </script>
 
 <template>
-  <LoginForm :risk-state="riskState" @submit="login" />
+  <LoginForm :risk-state="riskState" :captcha-target="48" :captcha-verifier="verifyCaptcha" @submit="login" />
 </template>`,
-  'jigsaw-captcha': basicImportCode('JigsawCaptcha', `  <JigsawCaptcha @success="(token) => console.log(token)" />`),
+  'jigsaw-captcha': `<script setup lang="ts">
+import { JigsawCaptcha } from '@smartwarehouse/platform-ui'
+
+async function verifyCaptcha(x: number): Promise<string> {
+  console.log('slider x:', x)
+  return 'captcha-verify-token'
+}
+</script>
+
+<template>
+  <JigsawCaptcha :target="48" :verifier="verifyCaptcha" @success="(token) => console.log(token)" />
+</template>`,
   'material-requirement-editor': `<script setup lang="ts">
 import { ref } from 'vue'
 import { MaterialRequirementEditor } from '@smartwarehouse/platform-ui'
@@ -536,15 +574,29 @@ const componentConfig: Record<string, ComponentDocConfig> = {
       prop('breadcrumbs', 'BreadcrumbItem[]', '[]', '面包屑数据。'),
       prop('user', 'LoginUser', '-', '当前登录用户。'),
       prop('activePath', 'string', "''", '当前激活菜单路径。'),
-      prop('collapsed', 'boolean', 'false', '侧边栏是否收起。')
+      prop('collapsed', 'boolean', 'false', '侧边栏是否收起。'),
+      prop('showAside', 'boolean', 'true', '是否显示左侧侧边栏。'),
+      prop('brandAbbr', 'string', "''", '品牌区优先显示的缩写文案，例如 SW-AI；未传时回退为 title。'),
+      prop('showWorkbenchButton', 'boolean', 'false', '是否显示顶部“工作台”按钮。'),
+      prop('showWorkbenchDrawerButton', 'boolean', 'false', '是否在模块抽屉中显示“返回工作台”按钮。'),
+      prop('showModuleDrawerTrigger', 'boolean', 'false', '是否显示左上角模块抽屉触发按钮。'),
+      prop('moduleEntries', 'FrontendModule[]', '[]', '模块抽屉的数据源。'),
+      prop('activeModuleCode', 'string', "''", '当前高亮的模块编码。')
     ],
     events: [
       event('update:collapsed', '[value: boolean]', '侧边栏收起状态变化。'),
       event('menuClick', '[menu: NavMenuItem]', '点击菜单项。'),
       event('userCommand', '[command: string]', '用户菜单命令。'),
-      event('logout', '[]', '点击退出登录。')
+      event('logout', '[]', '点击退出登录。'),
+      event('workbenchClick', '[]', '点击工作台按钮。'),
+      event('moduleSelect', '[module: FrontendModule]', '在模块抽屉中选择模块。')
     ],
-    slots: [slot('default', '-', '主内容区。')]
+    slots: [slot('default', '-', '主内容区。')],
+    notes: [
+      'showAside=false 时适合门户工作台页，内容区会占满主区域。',
+      'showWorkbenchButton 与 showModuleDrawerTrigger 属于 host 专属能力，standalone 子应用应按场景隐藏。',
+      'moduleEntries 仅负责数据展示与选择，不负责远程模块加载。'
+    ]
   },
   'platform-page': {
     props: [prop('title', 'string', '-', '页面标题。'), prop('description', 'string', '-', '页面描述。')],
@@ -713,11 +765,19 @@ const componentConfig: Record<string, ComponentDocConfig> = {
     ]
   },
   'login-form': {
-    props: [prop('loading', 'boolean', 'false', '登录按钮 loading。'), prop('riskState', 'LoginRiskState', '-', '登录风控状态。')],
-    events: [event('submit', '[model: LoginFormModel]', '提交登录表单。')]
+    props: [
+      prop('loading', 'boolean', 'false', '登录按钮 loading。'),
+      prop('riskState', 'LoginRiskState', '-', '登录风控状态。'),
+      prop('captchaTarget', 'number', '-', '后端挑战对应的滑块目标位置，未传入时使用本地演示目标。'),
+      prop('captchaVerifier', '(x: number) => Promise<string>', '-', '后端验证码校验函数，返回一次性验证码通过 token。')
+    ],
+    events: [event('submit', '[model: LoginFormModel]', '提交登录表单。'), event('captchaReset', '[]', '用户刷新验证码。')]
   },
   'jigsaw-captcha': {
-    props: [],
+    props: [
+      prop('target', 'number', '-', '滑块目标位置，适用于后端挑战和前端展示对齐。'),
+      prop('verifier', '(x: number) => Promise<string>', '-', '后端校验函数，未传入时使用本地演示 token。')
+    ],
     events: [event('success', '[token: string]', '拼图验证成功。'), event('reset', '[]', '刷新拼图。')]
   },
   'material-requirement-editor': {
@@ -793,6 +853,15 @@ function typesFor(slug: string): string {
   path: string
   moduleCode?: 'sys' | 'wms' | 'mes' | 'task' | 'ai'
   children?: NavMenuItem[]
+}
+
+interface FrontendModule {
+  moduleCode: 'sys' | 'wms' | 'mes' | 'task' | 'ai'
+  moduleName: string
+  routePrefix: string
+  entryUrl: string
+  apiPrefix: string
+  ownerType: 'OWNER' | 'VENDOR'
 }`,
     'platform-form': `interface FormFieldSchema {
   prop: string

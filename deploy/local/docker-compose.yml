@@ -1,0 +1,120 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: smartwarehouse-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-smart_root_dev}
+      MYSQL_DATABASE: smart_sys
+      MYSQL_USER: ${MYSQL_APP_USER:-smart_sys}
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD:-smart_sys_dev}
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_PORT:-13306}:3306"
+    volumes:
+      - ../mysql/init-sys-db.sql:/docker-entrypoint-initdb.d/init-sys-db.sql:ro
+      - ../../data/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-smart_root_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4
+    container_name: smartwarehouse-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-16381}:6379"
+    volumes:
+      - ../../data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: smartwarehouse-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-smartwarehouse}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-smartwarehouse_dev}
+      TZ: Asia/Shanghai
+    ports:
+      - "${RABBITMQ_PORT:-5673}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15673}:15672"
+    volumes:
+      - ../../data/rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  nacos:
+    image: nacos/nacos-server:v2.4.3
+    container_name: smartwarehouse-nacos
+    environment:
+      MODE: standalone
+      TZ: Asia/Shanghai
+    ports:
+      - "${NACOS_PORT:-18848}:8848"
+      - "${NACOS_GRPC_PORT:-19848}:9848"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8848/nacos/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  sentinel:
+    image: bladex/sentinel-dashboard:1.8.8
+    container_name: smartwarehouse-sentinel
+    ports:
+      - "${SENTINEL_PORT:-8858}:8858"
+
+  gateway-service:
+    build:
+      context: ../..
+      dockerfile: gateway/deploy/Dockerfile
+    container_name: smartwarehouse-gateway
+    environment:
+      SMARTWAREHOUSE_JWT_SECRET: ${SMARTWAREHOUSE_JWT_SECRET:-change-me-in-local-dev-only-at-least-32-chars}
+      SYS_SERVICE_URI: lb://sys-service
+      SMARTWAREHOUSE_NACOS_SERVER_ADDR: nacos:8848
+      SMARTWAREHOUSE_REDIS_HOST: redis
+      SMARTWAREHOUSE_REDIS_PORT: 6379
+    ports:
+      - "${GATEWAY_PORT:-9200}:9200"
+    depends_on:
+      sys-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+
+  sys-service:
+    build:
+      context: ../..
+      dockerfile: sys/deploy/Dockerfile
+    container_name: smartwarehouse-sys
+    environment:
+      SMARTWAREHOUSE_JWT_SECRET: ${SMARTWAREHOUSE_JWT_SECRET:-change-me-in-local-dev-only-at-least-32-chars}
+      SMARTWAREHOUSE_DEMO_PASSWORD: ${SMARTWAREHOUSE_DEMO_PASSWORD:-123456}
+      SMARTWAREHOUSE_SYS_DATASOURCE_URL: jdbc:mysql://mysql:3306/smart_sys?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      SMARTWAREHOUSE_SYS_DATASOURCE_USERNAME: ${MYSQL_APP_USER:-smart_sys}
+      SMARTWAREHOUSE_SYS_DATASOURCE_PASSWORD: ${MYSQL_APP_PASSWORD:-smart_sys_dev}
+      SMARTWAREHOUSE_REDIS_HOST: redis
+      SMARTWAREHOUSE_REDIS_PORT: 6379
+      SMARTWAREHOUSE_NACOS_SERVER_ADDR: nacos:8848
+    ports:
+      - "${SYS_PORT:-9201}:9201"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy

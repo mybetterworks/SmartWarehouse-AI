@@ -15,54 +15,99 @@ MySQL / Redis / Nacos Docker 容器
 ## 2. 命令步骤
 
 ```powershell
-docker compose -f deploy/local/docker-compose.yml up -d mysql redis nacos
-mvn -pl platform -am -DskipTests install
-mvn -pl sys/sys-service -am test
-mvn -pl gateway/gateway-service -am test
+set MYSQL_ROOT_PASSWORD=<DB_PASSWORD>
+set SMARTWAREHOUSE_JWT_SECRET=<JWT_SECRET>
+set SMARTWAREHOUSE_DEMO_PASSWORD=<DEMO_PASSWORD>
+docker compose -f deploy/local/docker-compose.yml config
+mvn test
+mvn package -DskipTests
 cd frontend-platform
-pnpm install
-pnpm build
+corepack pnpm install
+corepack pnpm build
 ```
 
 ## 3. 关键代码位置
 
 ```text
-platform
+pom.xml
+platform/pom.xml
+platform/platform-parent/pom.xml
+platform/platform-bom/pom.xml
+platform/platform-common-core
+platform/platform-common-web
+platform/platform-common-data
+platform/platform-common-security-lite
+platform/platform-common-redis
+platform/platform-common-mq
+platform/platform-common-log
+platform/platform-common-id
 gateway/gateway-service
 sys/sys-api
 sys/sys-service
 frontend-platform/apps/portal-shell
 frontend-platform/apps/sys-web
-Jenkinsfile
-deploy/eci
+deploy/jenkins/Jenkinsfile
+deploy/local/docker-compose.yml
+deploy/mysql/init-sys-db.sql
+deploy/aliyun-eci/formal-release-checklist.md
 ```
 
 ## 4. 核心代码片段
 
-版本完成后补充：
-
 ```java
 // Gateway JWT 鉴权过滤器
+// 文件：gateway/gateway-service/src/main/java/com/smartwarehouse/gateway/filter/JwtAuthGlobalFilter.java
+// 核心逻辑：
+// 1. 放行 /api/sys/auth/login、refresh、captcha、risk-state 和 /actuator/health。
+// 2. 其他请求必须从 Authorization 或 X-Access-Token 读取 Access Token。
+// 3. 解析 JWT 后把 X-User-Id、X-Username、X-Roles、X-Warehouse-Ids 透传给下游服务。
 ```
 
 ```java
 // sys-service 登录风控
+// 文件：sys/sys-service/src/main/java/com/smartwarehouse/sys/risk/LoginRiskService.java
+// 核心逻辑：
+// 1. 同一账号失败 3 次后 captchaRequired=true。
+// 2. 同一账号失败 5 次后 lockedUntil=now+10分钟。
+// 3. 拼图验证码挑战和通过 token 先用内存 Map 模拟 Redis Key，后续替换 Redis。
 ```
 
 ```ts
 // portal-shell 登录和菜单加载
+// 文件：frontend-platform/apps/portal-shell/src/App.vue
+// 核心逻辑：
+// 1. LoginForm 提交账号密码。
+// 2. 如果后端返回 CAPTCHA_REQUIRED，则加载 /api/sys/auth/captcha/jigsaw。
+// 3. JigsawCaptcha 调用 captchaVerifier，把 x 传给 /api/sys/auth/captcha/verify。
+// 4. 登录成功后加载 /auth/me、/menus/tree、/frontend-modules/enabled。
 ```
 
 ```groovy
 // Jenkins 测试环境流水线
+// 文件：deploy/jenkins/Jenkinsfile
+// 核心阶段：
+// Java Test -> Frontend Install -> Frontend Build -> Docker Build -> Local Test Deploy -> Health Check
 ```
 
 ## 5. 验证命令
 
 ```powershell
-mvn -pl sys/sys-service -am test
-mvn -pl gateway/gateway-service -am test
-pnpm build
+mvn test -q
+mvn package -DskipTests -q
+cd frontend-platform
+corepack pnpm install
+corepack pnpm build
+cd ..
+
+# 启动验证时必须显式注入本地演示密码和 JWT Secret
+$env:SMARTWAREHOUSE_JWT_SECRET='local-dev-secret-for-v02-validation-32chars'
+$env:SMARTWAREHOUSE_DEMO_PASSWORD='<DEMO_PASSWORD>'
+java -jar sys/sys-service/target/sys-service-*.jar
+java -jar gateway/gateway-service/target/gateway-service-*.jar
+
+# 配置检查
+$env:MYSQL_ROOT_PASSWORD='<DB_PASSWORD>'
+docker compose -f deploy/local/docker-compose.yml config
 ```
 
 ## 6. 常见错误
@@ -71,21 +116,593 @@ pnpm build
 2. 登录失败次数放本地内存。
 3. Jenkins 凭证写入仓库。
 4. 阿里弹性容器正式环境配置没有健康检查。
+5. portal-shell/sys-web 为了联调方便从 `../../packages/**` 导入组件源码，导致后续无法切换 npm 私库制品。
+6. AI 自动执行 `pnpm publish` 或 `npm publish` 推送 snapshot/release，这是禁止的；真实发布必须用户手动设置版本号并发布。
+7. 将本地演示密码、JWT Secret、Docker Hub 凭证、阿里云密钥写进 application.yml、Jenkinsfile 或 Dockerfile。
+8. Docker Hub 无法拉取基础镜像时误判为 Dockerfile 错误；应先检查网络、镜像加速器或基础镜像缓存。
 
 ## 7. 手动还原步骤
 
-1. 实现 platform 公共模块。
-2. 实现 gateway 路由和鉴权。
-3. 实现 sys 登录、权限、日志和风控。
-4. 实现 portal-shell 和 sys-web。
-5. 配置 Jenkins 测试发布。
-6. 配置阿里弹性容器正式发布基线。
+1. 创建根 `pom.xml`，只聚合 `platform`、`gateway`、`sys`。
+2. 创建 `platform/platform-parent` 和 `platform/platform-bom`。
+3. 创建 `platform-common-*` 公共包，先实现统一响应、分页、异常、TraceId、JWT、数据权限模型、Redis Key、MQ 事件、操作日志注解和 ID 生成器。
+4. 创建 `sys/sys-api`，沉淀认证和系统管理 DTO。
+5. 创建 `sys/sys-service`，实现 JDBC 仓储、认证服务、风控服务、Token 黑名单、AuthController，并按用户、角色、菜单、组织岗位、字典、前端模块、审计日志和风控记录拆分 Controller。
+6. 创建 `gateway/gateway-service`，实现固定路由、TraceId、CORS、JWT 鉴权和基础限流。
+7. 创建 `frontend-platform/apps/portal-shell`，使用 LoginForm、PlatformLayout、PlatformPage 和 platform-sdk 完成登录门户。
+8. 创建 `frontend-platform/apps/sys-web`，使用 PlatformLayout、PlatformPage、PlatformTable、StatusTag 完成系统管理页。
+9. 增强 LoginForm/JigsawCaptcha，使其支持后端验证码 verifier，并更新组件文档。
+10. 更新 `frontend-platform/package.json`，让 `corepack pnpm build` 同时构建平台包、portal-shell、sys-web 和 docs。
+11. 创建 `deploy/jenkins/Jenkinsfile`、Dockerfile、docker-compose、SQL 初始化脚本、Nacos 模板和阿里弹性容器发布检查清单。
+12. 执行 Maven 测试、前端构建、服务启动联调、compose config、依赖规则扫描和敏感信息扫描。
 
 ## 8. 改进记录
 
 ```text
-日期：
+日期：2026-06-13
 改进内容：
+- 补充 V02 甲方前后端基座完整手搓步骤。
+- 明确 npm 私库真实发布禁止由 AI 自动执行。
+- 增加 LoginForm/JigsawCaptcha 后端验证码联调说明。
+- 增加 Docker Hub 基础镜像拉取失败的排查说明。
 原因：
+- V02 已完成真实代码落地，需要 handle 能支撑手动还原。
 验证结果：
+- `mvn test -q` 通过。
+- `mvn package -DskipTests -q` 通过。
+- `corepack pnpm build` 通过。
+- gateway/sys 启动联调通过。
+- `docker compose -f deploy/local/docker-compose.yml config` 通过。
 ```
+
+
+## 9. 2026-06-14 商业化补齐手搓步骤
+
+### 9.1 启动 Docker 中间件
+
+~~~powershell
+docker compose -f deploy/local/docker-compose.yml up -d mysql redis rabbitmq nacos
+~~~
+
+当前 `deploy/local/docker-compose.yml` 已内置本地开发默认值：MySQL `13306`、Redis `16381`、RabbitMQ `5673`、RabbitMQ Management `15673`、Nacos `18848`。手动复现时不需要再先设置端口环境变量。
+
+### 9.2 修复并验证 MySQL 初始化数据
+
+~~~powershell
+# 初始化脚本顶部必须包含 SET NAMES utf8mb4，避免中文种子数据乱码。
+cmd.exe /c "docker exec -i smartwarehouse-mysql mysql --default-character-set=utf8mb4 -uroot -p<DB_PASSWORD> < deploy\mysql\init-sys-db.sql"
+
+docker exec smartwarehouse-mysql mysql --default-character-set=utf8mb4 -usmart_sys -p<DB_PASSWORD> smart_sys -e "select username,nickname,status from sys_user; select module_code,module_name,status from sys_frontend_module;"
+~~~
+
+### 9.3 后端测试与打包
+
+~~~powershell
+docker compose -f deploy/local/docker-compose.yml up -d mysql redis rabbitmq nacos
+mvn -q -pl sys/sys-service,gateway/gateway-service -am test package
+~~~
+
+`mvn test` 会同时执行 H2 快速测试和 `LocalDockerMiddlewareAcceptanceTest`。后者使用默认配置连接真实 Docker MySQL/Redis，验证登录、模块查询和岗位增改删，确保自动测试与人工启动配置一致。
+
+### 9.4 本地启动 sys-service 与 gateway
+
+~~~powershell
+java -jar sys/sys-service/target/sys-service-*.jar
+
+java -jar gateway/gateway-service/target/gateway-service-*.jar
+~~~
+
+`sys-service` 默认连接 `127.0.0.1:13306/smart_sys`、`127.0.0.1:16381` 和 Nacos `127.0.0.1:18848`；`gateway` 默认连接 `127.0.0.1:16381` 和 Nacos `127.0.0.1:18848`，并通过 `lb://sys-service` 路由到 sys-service。除非你主动修改了 Docker 端口，否则不要再额外设置这些环境变量。
+
+### 9.5 接口验收要点
+
+必须验收：
+- 未登录访问 /api/sys/users 返回 401。
+- 使用 admin / 123456 登录成功返回 Access Token / Refresh Token。
+- /api/sys/auth/me 返回当前用户。
+- /api/sys/menus/tree 返回菜单树。
+- 用户、角色、部门、岗位、字典、前端模块接口均可查询。
+- 任意临时岗位可新增、修改、删除，并产生操作日志。
+- 退出登录后旧 Token 访问受保护接口返回 401。
+- 临时用户名连续失败 3 次后，risk-state 返回 captchaRequired=true。
+
+### 9.6 前端构建与页面验收
+
+~~~powershell
+cd frontend-platform
+corepack pnpm build:packages
+corepack pnpm --filter @smartwarehouse/portal-shell --filter @smartwarehouse/sys-web build
+corepack pnpm --filter @smartwarehouse/portal-shell dev
+corepack pnpm --filter @smartwarehouse/sys-web dev
+~~~
+
+浏览器验收：
+- 打开 http://localhost:5174/，使用 admin / 123456 登录。
+- 门户应显示系统管理、仓储管理、生产执行、运营看板、AI 助手。
+- sys-web 独立调试时可打开 http://localhost:5175/apps/sys/，使用 admin / 123456 登录。
+- 门户集成验收以后续 `http://localhost:5174/sys/**` 为准，5175 只作为独立调试入口。
+
+### 9.7 Docker 构建检查
+
+~~~powershell
+$env:MYSQL_ROOT_PASSWORD='<DB_PASSWORD>'
+$env:MYSQL_APP_USER='smart_sys'
+$env:MYSQL_APP_PASSWORD='<DB_PASSWORD>'
+$env:SMARTWAREHOUSE_JWT_SECRET='<JWT_SECRET>'
+$env:SMARTWAREHOUSE_DEMO_PASSWORD='123456'
+docker compose -f deploy/local/docker-compose.yml config
+docker compose -f deploy/local/docker-compose.yml build sys-service gateway-service
+~~~
+
+本次 config 通过，build 因 Docker Hub 基础镜像 token 请求网络超时失败。遇到该问题时先配置镜像加速器或切换可访问网络，再重试构建，不要误判为 Dockerfile 错误。
+
+### 9.8 敏感信息处理
+
+- .npmrc 必须被 .gitignore 忽略。
+- .npmrc.example 只能保留占位符和环境变量，不写真实 registry 地址或 token。
+- frontend-platform/package.json 的发布脚本不写死具体 registry，真实 registry 由本地 .npmrc 或 Jenkins Credentials 注入。
+- 本次默认配置修正后，`.gitignore` 已追加 `data/temp/`，避免后端默认启动验证产生的临时日志进入 Git。
+
+## 10. 2026-06-15 Nacos 与门户单点集成手搓步骤
+
+### 10.1 接入 Nacos 服务发现
+
+~~~powershell
+docker compose -f deploy/local/docker-compose.yml up -d mysql redis rabbitmq nacos
+mvn -q -pl sys/sys-service,gateway/gateway-service -am test
+mvn -q -pl sys/sys-service,gateway/gateway-service -am package -DskipTests
+~~~
+
+关键修改点：
+- `platform/platform-parent/pom.xml`：引入 Spring Cloud Alibaba 依赖管理。
+- `gateway/gateway-service/pom.xml`：增加 Nacos Discovery 和 LoadBalancer。
+- `sys/sys-service/pom.xml`：增加 Nacos Discovery。
+- `gateway/gateway-service/src/main/resources/application.yml`：Nacos 默认 `127.0.0.1:18848`，sys 路由默认 `lb://sys-service`。
+- `sys/sys-service/src/main/resources/application.yml`：Nacos 默认 `127.0.0.1:18848`。
+- `deploy/local/docker-compose.yml`：Nacos 宿主机端口 `18848/19848`，容器内服务地址 `nacos:8848`。
+
+### 10.2 增加修改密码接口
+
+关键代码位置：
+- `sys/sys-api/src/main/java/com/smartwarehouse/sys/api/AuthDtos.java`：新增 `ChangePasswordRequest`。
+- `sys/sys-service/src/main/java/com/smartwarehouse/sys/controller/AuthController.java`：新增 `PUT /api/sys/auth/password`。
+- `sys/sys-service/src/main/java/com/smartwarehouse/sys/security/AuthService.java`：新增 `changePassword`，校验旧密码、新密码、确认密码、Token 状态和账号状态。
+- `sys/sys-service/src/main/java/com/smartwarehouse/sys/infrastructure/JdbcSysRepository.java`：新增 `updatePassword`。
+
+验收要点：
+- 后端测试覆盖改密成功路径。
+- 浏览器只验证弹窗和表单可用时，不要随意提交 admin 改密，避免破坏默认演示账号 `admin / 123456`。
+
+### 10.3 拆分 sys-service 控制器
+
+将单体 `SysManagementController` 拆分为：
+
+```text
+SysUserController
+SysRoleController
+SysMenuController
+SysOrgController
+SysDictController
+SysFrontendModuleController
+SysAuditController
+```
+
+拆分时保持原 URL 不变，例如 `/api/sys/users`、`/api/sys/roles`、`/api/sys/menus`、`/api/sys/depts`、`/api/sys/dict-types`、`/api/sys/login-logs` 等，避免前端和外部调用一起改。
+
+### 10.4 门户统一路由承载 sys-web（历史阶段，已被微前端替代）
+
+关键代码位置：
+- `frontend-platform/apps/portal-shell/src/App.vue`：维护当前前端路由状态，点击系统管理目录或模块卡片时进入 `/sys/users`，点击后续模块时进入 `/wms`、`/mes`、`/task`、`/ai` 预留页；保留总控制台、个人信息和修改密码弹窗。
+- `frontend-platform/apps/portal-shell/src/api.ts`：新增 `changePassword` API。
+- `frontend-platform/apps/portal-shell/src/microFrontend.ts`：当前微前端运行时加载入口，根据模块注册信息加载 `sys-web`、`wms-web`、`mes-web`、`ai-web` remote。
+- `frontend-platform/apps/portal-shell/src/MicroFrontendOutlet.vue`：当前微前端承载组件，负责加载态、降级页、重试和超时保护。
+- `frontend-platform/apps/sys-web/src/remote.ts`：当前 `sys-web` remote 导出入口，暴露给 `portal-shell` 运行时加载。
+- `frontend-platform/apps/sys-web/src/App.vue`：支持独立登录模式，也支持根据 `/sys/users`、`/sys/roles` 等真实路径切换系统管理页签；独立调试时兼容 `/apps/sys/` 和 `redirect`。
+- `frontend-platform/apps/sys-web/src/api.ts`：新增 `changePassword`。
+- `frontend-platform/packages/platform-ui/src/components/SideMenu/SideMenu.vue`：有子菜单的一级目录标题也派发 `menuClick`，点击“系统管理”目录可进入默认页面。
+
+安全要点：
+- 不允许把 Access Token 或 Refresh Token 拼到 URL 查询参数。
+- 门户集成模式不使用 `redirect` 跨端口跳转，不把 `localhost:5175` 作为总控制台入口。
+- 生产环境优先通过同源 Nginx 路径、网关会话或 httpOnly Cookie 方案实现单点登录；本地统一入口使用 `http://localhost:5174/`。
+- 菜单和模块权限必须以后端过滤结果为准，前端只展示接口返回的授权模块。
+
+### 10.5 拆分 sys-web 页面
+
+将原本集中在 `App.vue` 的系统管理页面拆分到：
+
+```text
+frontend-platform/apps/sys-web/src/views/UserManagementView.vue
+frontend-platform/apps/sys-web/src/views/RoleManagementView.vue
+frontend-platform/apps/sys-web/src/views/MenuManagementView.vue
+frontend-platform/apps/sys-web/src/views/OrgPostManagementView.vue
+frontend-platform/apps/sys-web/src/views/DictManagementView.vue
+frontend-platform/apps/sys-web/src/views/FrontendModuleManagementView.vue
+frontend-platform/apps/sys-web/src/views/AuditLogView.vue
+frontend-platform/apps/sys-web/src/views/RiskRecordView.vue
+```
+
+`App.vue` 只保留登录态、菜单切换、用户菜单弹窗和页面组合。
+
+### 10.6 浏览器验收
+
+~~~powershell
+cd frontend-platform
+corepack pnpm --filter @smartwarehouse/portal-shell dev
+~~~
+
+验收步骤：
+- 打开 `http://localhost:5174/`。
+- 使用 `admin / 123456` 登录。
+- 页面应规范到 `http://localhost:5174/portal`。
+- 点击左侧“系统管理”或系统管理卡片“进入”，浏览器应进入 `http://localhost:5174/sys/users`。
+- sys-web remote 页面应直接显示用户管理页签，不再展示登录页，不进行跨端口页面跳转，也不通过 iframe 嵌入门户。
+- 当前 Module Federation 集成需要 `sys-web` remoteEntry 可访问；本地可通过 `corepack pnpm --filter @smartwarehouse/sys-web preview` 提供 `http://localhost:5175/apps/sys/assets/remoteEntry.js`。
+- 在系统管理内点击“角色管理”，浏览器应进入 `http://localhost:5174/sys/roles`，激活页签为“角色管理”。
+- 重新打开 `http://localhost:5174/`，使用 `wms_manager / 123456` 登录。
+- 页面只应显示“仓储管理”，不应显示“系统管理”“生产执行”“运营看板”“AI 助手”。
+- 点击右上角“个人信息”，应打开当前用户信息弹窗。
+- 点击右上角“修改密码”，应打开旧密码、新密码、确认密码表单。
+
+### 10.7 构建与安全检查
+
+~~~powershell
+corepack pnpm --filter @smartwarehouse/portal-shell --filter @smartwarehouse/sys-web build
+corepack pnpm build:packages
+corepack pnpm build:apps
+corepack pnpm build:docs
+git status --short
+rg -n "token|api_key|secret_key|BEGIN PRIVATE KEY|_authToken|npmrc|Authorization|Bearer" README.md docs/plan frontend-platform/apps/portal-shell frontend-platform/apps/sys-web gateway sys deploy
+~~~
+
+记录结论：
+
+### 10.8 sys 管理接口权限加固
+
+后端关键点：
+
+- `sys-service` 是统一认证中心，`/api/sys/auth/login` 不按 sys 模块权限拦截，否则 WMS、MES、AI 等业务账号无法登录总门户。
+- 系统管理接口必须在 `SysAuthenticationFilter` 中做服务端授权兜底；除 `/api/sys/auth/**`、`/api/sys/menus/tree`、`/api/sys/frontend-modules/enabled` 外，其余 sys 管理接口必须要求 `ADMIN` 角色或 `sys:*` 权限。
+- `wms_manager` 的正确行为是：可登录门户，可获取自己的 WMS 菜单和模块，但直接访问 `/api/sys/users` 返回 `FORBIDDEN`。
+
+前端关键点：
+
+- `sys-web` 独立登录成功后，必须检查当前用户是否拥有 `ADMIN` 角色或 `sys:*` 权限。
+- 没有 sys 管理权限时，清理 Token、回到登录页，并提示“当前账号无系统管理访问权限”。
+
+验证命令：
+
+~~~powershell
+mvn -q -pl sys/sys-service,gateway/gateway-service -am test
+
+cd frontend-platform
+corepack pnpm --filter @smartwarehouse/portal-shell --filter @smartwarehouse/sys-web build
+~~~
+
+接口验收：
+
+- `admin / 123456`：可访问 `/api/sys/users`。
+- `wms_manager / 123456`：可访问 `/api/sys/auth/me`。
+- `wms_manager / 123456`：`/api/sys/menus/tree` 和 `/api/sys/frontend-modules/enabled` 只返回 WMS。
+
+## 12. 手搓补充：vite-plugin-federation 微前端改造
+
+### 12.1 安装依赖
+
+```powershell
+cd E:\Code\codex\SmartWarehouse-AI\frontend-platform
+corepack pnpm add -D @originjs/vite-plugin-federation -w
+corepack pnpm install
+```
+
+注意：`wms-web`、`mes-web`、`ai-web` 位于项目根目录，因此 `frontend-platform/pnpm-workspace.yaml` 需要包含：
+
+```yaml
+packages:
+  - "packages/*"
+  - "apps/*"
+  - "../wms-web"
+  - "../mes-web"
+  - "../ai-web"
+```
+
+### 12.2 portal-shell host 改造要点
+
+1. `frontend-platform/apps/portal-shell/vite.config.ts` 引入 federation 插件。
+2. host 使用运行时 remote 注册，因此保留一个占位 remote 让插件生成 `virtual:__federation__`。
+3. `build.target` 设置为 `esnext`，支持 Federation 共享模块中的 top-level await。
+4. 新增 `src/microFrontend.ts`：
+
+```ts
+__federation_method_setRemote(module.remoteName, {
+  url: module.remoteEntry,
+  format: 'esm',
+  from: 'vite'
+})
+const remoteModule = await __federation_method_getRemote(module.remoteName, module.exposedModule)
+```
+
+5. 新增 `src/MicroFrontendOutlet.vue`，负责加载远程组件、显示 loading、失败降级和重试。
+6. 降级页必须包含模块编码、远程容器、remoteEntry、暴露模块和当前路由，方便排查。
+
+### 12.3 remote 应用改造要点
+
+每个 remote 的 `vite.config.ts` 保持相同模式：
+
+```ts
+federation({
+  name: 'smart_wms_web',
+  filename: 'remoteEntry.js',
+  exposes: {
+    './RemoteApp': './src/remote.ts'
+  },
+  shared: [
+    'vue',
+    'element-plus',
+    '@element-plus/icons-vue',
+    '@smartwarehouse/platform-ui',
+    '@smartwarehouse/platform-sdk',
+    '@smartwarehouse/platform-theme',
+    '@smartwarehouse/platform-types'
+  ]
+})
+```
+
+`src/remote.ts` 示例：
+
+```ts
+import './style.css'
+
+export { default } from './RemoteApp.vue'
+```
+
+### 12.4 模块注册表改造
+
+`sys_frontend_module` 增加字段：
+
+```sql
+remote_name VARCHAR(128),
+remote_entry VARCHAR(255),
+exposed_module VARCHAR(128)
+```
+
+本地 preview 默认值：
+
+```text
+sys -> http://localhost:5175/apps/sys/assets/remoteEntry.js
+wms -> http://localhost:5176/apps/wms/assets/remoteEntry.js
+mes -> http://localhost:5177/apps/mes/assets/remoteEntry.js
+ai  -> http://localhost:5178/apps/ai/assets/remoteEntry.js
+```
+
+历史 Docker MySQL 数据卷可能没有新字段，因此 sys-service 增加 `SysFrontendModuleSchemaInitializer`，启动时自动补列并回填空值或旧默认值。
+
+### 12.5 构建验证命令
+
+```powershell
+cd E:\Code\codex\SmartWarehouse-AI\frontend-platform
+corepack pnpm build:packages
+corepack pnpm --filter @smartwarehouse/portal-shell build
+corepack pnpm build:remotes
+
+cd E:\Code\codex\SmartWarehouse-AI
+mvn -pl sys/sys-service -am test
+```
+
+### 12.6 本地运行验证命令
+
+先构建 remotes，再用 preview 模拟乙方发布后的静态制品：
+
+```powershell
+cd E:\Code\codex\SmartWarehouse-AI\frontend-platform
+corepack pnpm --filter @smartwarehouse/sys-web preview
+corepack pnpm --filter @smartwarehouse/wms-web preview
+corepack pnpm --filter @smartwarehouse/mes-web preview
+corepack pnpm --filter @smartwarehouse/ai-web preview
+```
+
+另开终端启动门户：
+
+```powershell
+cd E:\Code\codex\SmartWarehouse-AI\frontend-platform
+corepack pnpm --filter @smartwarehouse/portal-shell dev
+```
+
+访问并验证：
+
+```text
+http://localhost:5174/portal
+http://localhost:5174/sys/users
+http://localhost:5174/wms
+http://localhost:5174/mes
+http://localhost:5174/ai
+```
+
+### 12.7 降级页验证
+
+1. 正常启动 `portal-shell` 和四个 remote。
+2. 访问 `/wms`、`/mes`、`/ai`，确认页面显示 remote 内容。
+3. 停止其中一个 remote，例如 `ai-web`。
+4. 刷新 `/ai`。
+5. 页面应显示“微前端模块加载失败”，并展示 remoteEntry 等排查信息。
+6. 再访问 `/wms`，WMS remote 应继续正常展示。
+
+### 12.8 常见错误
+
+1. `Missing "./package.json" specifier`：平台包 `exports` 没开放 `./package.json`，需要在 `platform-ui/sdk/theme/types` 的 package.json 中补充。
+2. `Top-level await is not available`：host 或 remote 的 Vite build target 不是 `esnext`。
+3. `remoteEntry.js 404`：检查 Vite `base`，preview 下路径通常是 `/apps/<module>/assets/remoteEntry.js`。
+4. 远程模块长时间 loading：需要给 remote 加载增加超时保护，并显示降级页。
+5. 乙方发版要改 portal-shell：说明仍然是构建期静态依赖，未真正完成运行时微前端。
+6. 继续新增 `@smartwarehouse/*-web/embedded`：说明仍在沿用历史方案，应改为 remote 暴露 `./RemoteApp`，并由 `sys_frontend_module` 注册 remoteEntry。
+- `wms_manager / 123456`：访问 `/api/sys/users` 返回 `FORBIDDEN`。
+- 拆分构建均通过。
+- 单次 `corepack pnpm build` 如因执行超时中断，应记录拆分构建结果，而不是误判为代码失败。
+- `.gitignore` 已覆盖本次新增构建产物、日志、本地配置和真实 `.npmrc`，无需新增规则。
+
+### 12.9 门户路由承载修正历史说明（已被替代）
+
+本节记录 V02 中间阶段的演进历史：当时曾通过 `@smartwarehouse/sys-web/embedded` 把系统管理页面承载到 `portal-shell` 的 `/sys/**` 路由下，目的是先去掉 iframe、跨端口跳转和二次登录。
+
+该方案已经被后续 `vite-plugin-federation` 运行时微前端方案替代。当前不要再新增 `./embedded` 导出，不要在 `portal-shell` 中静态导入 `@smartwarehouse/*-web/embedded`，也不要把任一乙方前端作为门户构建期依赖。
+
+当前手搓实现请以本文档“12. 手搓补充：vite-plugin-federation 微前端改造”为准，核心步骤是：
+
+1. 子应用在 `vite.config.ts` 中配置 `federation({ name, filename: 'remoteEntry.js', exposes: { './RemoteApp': './src/remote.ts' } })`。
+2. 子应用 `src/remote.ts` 默认导出可被门户挂载的 Vue 根组件。
+3. `portal-shell` 只根据 `sys_frontend_module.remote_name`、`remote_entry`、`exposed_module` 运行时加载 remote。
+4. 本地集成必须先构建 remote，再用 preview 验证真实制品路径，例如 `/apps/sys/assets/remoteEntry.js`。
+
+验收结论：
+
+- `http://localhost:5174/` -> `/portal`。
+- 点击系统管理 -> `http://localhost:5174/sys/users`。
+- 点击角色管理 -> `http://localhost:5174/sys/roles`。
+- 当前 Module Federation 集成需要对应 remoteEntry 可访问；本地可通过 `sys-web` 的 preview 服务提供 `5175/apps/sys/assets/remoteEntry.js`。
+
+### 12.10 微前端收口清理手搓步骤
+
+```powershell
+cd E:\Code\codex\SmartWarehouse-AI\frontend-platform
+corepack pnpm build:packages
+corepack pnpm --filter @smartwarehouse/portal-shell build
+corepack pnpm build:remotes
+
+cd E:\Code\codex\SmartWarehouse-AI
+mvn -pl sys/sys-service -am test
+```
+
+手动检查：
+
+1. `frontend-platform/apps/sys-web/package.json` 不再暴露 `./embedded`。
+2. `frontend-platform/apps/sys-web/src/embedded.ts` 不再存在。
+3. `portal-shell` 代码中不存在 `@smartwarehouse/sys-web/embedded` 静态导入。
+4. `sys-web`、`wms-web`、`mes-web`、`ai-web` 构建后均生成 `dist/assets/remoteEntry.js`。
+5. 本地 preview 验证 remoteEntry：
+
+```text
+http://localhost:5175/apps/sys/assets/remoteEntry.js
+http://localhost:5176/apps/wms/assets/remoteEntry.js
+http://localhost:5177/apps/mes/assets/remoteEntry.js
+http://localhost:5178/apps/ai/assets/remoteEntry.js
+```
+
+## 13. 门户工作台与 hosted sys 布局改造手搓步骤
+
+### 13.1 后端工作台接口与数据表
+
+关键改动位置：
+
+```text
+sys/sys-api/src/main/java/com/smartwarehouse/sys/api/SysDtos.java
+sys/sys-service/src/main/java/com/smartwarehouse/sys/controller/SysPortalController.java
+sys/sys-service/src/main/java/com/smartwarehouse/sys/application/SysManagementService.java
+sys/sys-service/src/main/java/com/smartwarehouse/sys/infrastructure/SysRepository.java
+sys/sys-service/src/main/java/com/smartwarehouse/sys/infrastructure/JdbcSysRepository.java
+sys/sys-service/src/main/java/com/smartwarehouse/sys/security/SysAuthenticationFilter.java
+deploy/mysql/init-sys-db.sql
+sys/sys-service/src/test/resources/schema-h2.sql
+sys/sys-service/src/test/resources/data-h2.sql
+sys/sys-service/src/test/java/com/smartwarehouse/sys/AuthFlowIntegrationTest.java
+```
+
+本轮约定：
+
+1. 新增 `sys_portal_notice` 与 `sys_portal_access_log` 两张表。
+2. `GET /api/sys/portal/workbench` 对任意已登录用户开放，返回 `profile`、`notices`、`commonModules`、`recentModules`、`loginRecords`。
+3. `POST /api/sys/portal/access-log` 只接收 `moduleCode`、`routePath`，只记录模块级进入。
+4. `commonModules` 与 `recentModules` 都必须与当前用户已授权模块求交集。
+5. `/api/sys/users` 等系统管理接口仍保持 `ADMIN` / `sys:*` 授权兜底。
+
+### 13.2 组件库统一布局升级
+
+关键改动位置：
+
+```text
+frontend-platform/packages/platform-types/src/index.ts
+frontend-platform/packages/platform-ui/src/components/PlatformLayout/PlatformLayout.vue
+frontend-platform/packages/platform-ui/src/index.ts
+frontend-platform/packages/platform-ui/src/types.ts
+frontend-platform/apps/docs/src/componentDocs.ts
+frontend-platform/apps/docs/src/componentCatalog.ts
+frontend-platform/apps/docs/src/scenarioTemplateDocs.ts
+```
+
+新增布局能力：
+
+1. `showAside`：控制是否显示左侧菜单。
+2. `showWorkbenchButton`：顶部固定显示“工作台”按钮。
+3. `showModuleDrawerTrigger`：左上角显示模块抽屉按钮。
+4. `moduleEntries`：模块抽屉的数据源，直接使用 `FrontendModule[]`。
+5. `activeModuleCode`：高亮当前模块卡片。
+6. `workbenchClick`、`moduleSelect`：统一事件出口。
+
+手动检查点：
+
+1. 顶栏必须是 sticky。
+2. `showAside=false` 时不显示折叠按钮，也不保留侧栏占位。
+3. 模块抽屉宽度桌面约 `760px`，移动端全宽，带搜索和两列模块卡片。
+4. 组件文档中必须同步出现 `portal-workbench` 与新版 `standard-layout` 模板。
+
+### 13.3 portal-shell 统一壳层改造
+
+关键改动位置：
+
+```text
+frontend-platform/apps/portal-shell/src/App.vue
+frontend-platform/apps/portal-shell/src/api.ts
+frontend-platform/apps/portal-shell/src/MicroFrontendOutlet.vue
+frontend-platform/apps/portal-shell/src/microFrontend.ts
+```
+
+实施步骤：
+
+1. 登录后始终渲染统一 `PlatformLayout`，不要再让 remote 覆盖整页。
+2. `/portal` 显示工作台内容区，`showAside=false`。
+3. `/sys/**`、`/wms/**`、`/mes/**`、`/ai/**` 进入模块时，`showAside=true`，并且左侧菜单只保留当前模块菜单。
+4. 顶部固定“工作台”按钮返回 `/portal`。
+5. 左上角模块抽屉读取 `/sys/frontend-modules/enabled`。
+6. 模块切换时调用 `/sys/portal/access-log`，sys 内部子菜单切换不要重复上报。
+
+### 13.4 sys-web 独立壳层与 hosted 内容区拆分
+
+关键改动位置：
+
+```text
+frontend-platform/apps/sys-web/src/App.vue
+frontend-platform/apps/sys-web/src/StandaloneShell.vue
+frontend-platform/apps/sys-web/src/HostedRemote.vue
+frontend-platform/apps/sys-web/src/remote.ts
+frontend-platform/apps/sys-web/src/useSysManagement.ts
+```
+
+实施步骤：
+
+1. `App.vue` 只负责 standalone 登录恢复与壳层切换。
+2. `remote.ts` 默认暴露 hosted 版内容组件。
+3. hosted 模式下不得渲染登录页、`PlatformLayout` 或 tabs。
+4. standalone 模式继续保留独立登录能力，但隐藏工作台按钮与模块抽屉。
+5. 页面内容映射 hosted 与 standalone 走同一套系统管理内容组件。
+
+### 13.5 构建与验收命令
+
+```powershell
+cd E:\Code\codex\SmartWarehouse-AI
+mvn -q -pl sys/sys-service -am test
+
+cd E:\Code\codex\SmartWarehouse-AI\frontend-platform
+corepack pnpm build:packages
+corepack pnpm --filter @smartwarehouse/portal-shell build
+corepack pnpm --filter @smartwarehouse/sys-web build
+corepack pnpm build:remotes
+corepack pnpm --filter @smartwarehouse/component-docs build
+```
+
+### 13.6 页面验收清单
+
+1. 已登录从 `/portal` 进入 `/sys/users`，不出现 `sys-web` 登录页闪现。
+2. `portal-shell` 顶部固定显示“工作台”按钮和模块抽屉按钮。
+3. `/portal` 不显示左侧菜单；进入 `/sys/**` 后只显示 sys 菜单。
+4. standalone `sys-web` 可独立登录，并使用新的左侧菜单布局。
+5. standalone `wms/mes/ai` 不出现 host 专属入口报错。
+6. 模块抽屉可搜索、可切换模块，在当前少模块场景下不显空荡。

@@ -1,6 +1,11 @@
 <template>
   <el-breadcrumb class="sw-breadcrumb" separator="/">
-    <el-breadcrumb-item v-for="item in items" :key="item.path ?? item.title" :to="item.path ? { path: item.path } : undefined">
+    <el-breadcrumb-item
+      v-for="item in items"
+      :key="item.path ?? item.title"
+      :class="{ 'sw-breadcrumb__item--link': Boolean(item.path) }"
+      @click="item.path && emit('itemClick', item)"
+    >
       {{ item.title }}
     </el-breadcrumb-item>
   </el-breadcrumb>
@@ -9,8 +14,12 @@
 <script setup lang="ts">
 import type { BreadcrumbItem } from '@smartwarehouse/platform-types'
 
-// 面包屑只承载页面路径展示，不从路由中反推层级。
-// 这样 sys、wms、mes、ai 独立前端都可以按自己的路由结构传入统一格式。
+const emit = defineEmits<{
+  itemClick: [item: BreadcrumbItem]
+}>()
+
+// BreadcrumbNav only renders breadcrumb items and forwards click intent.
+// Route changes remain the responsibility of the host shell or page container.
 withDefaults(
   defineProps<{
     items?: BreadcrumbItem[]

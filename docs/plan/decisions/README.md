@@ -70,3 +70,6 @@ PROPOSED
 | 0006 | 企业组件库文档站三入口结构 | SUPERSEDED |
 | 0007 | 组件入口单组件详情边界 | ACCEPTED |
 | 0008 | 删除预设式静态 Playground，保留组件与场景模板两入口 | ACCEPTED |
+| 0009 | 门户统一前端路由入口，子项目 embedded/route 接入 | SUPERSEDED |
+| 0010 | vite-plugin-federation 运行时微前端架构 | ACCEPTED |
+| 0011 | 门户壳层归 host，sys remote 只负责托管内容区 | ACCEPTED |

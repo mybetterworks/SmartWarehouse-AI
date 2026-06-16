@@ -15,7 +15,7 @@
       />
     </el-form-item>
     <el-form-item v-if="captchaRequired" label="安全验证">
-      <JigsawCaptcha @success="handleCaptchaSuccess" />
+      <JigsawCaptcha :target="captchaTarget" :verifier="captchaVerifier" @success="handleCaptchaSuccess" @reset="emit('captchaReset')" />
     </el-form-item>
     <div class="sw-login-form__row">
       <el-checkbox v-model="form.rememberMe">记住账号</el-checkbox>
@@ -35,6 +35,8 @@ const props = withDefaults(
   defineProps<{
     loading?: boolean
     riskState?: LoginRiskState
+    captchaTarget?: number
+    captchaVerifier?: (x: number) => Promise<string>
   }>(),
   {
     loading: false
@@ -43,6 +45,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   submit: [model: LoginFormModel]
+  captchaReset: []
 }>()
 
 const form = reactive<LoginFormModel>({

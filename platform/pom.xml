@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.smartwarehouse</groupId>
+    <artifactId>platform</artifactId>
+    <version>0.2.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>SmartWarehouse-AI Platform Aggregator</name>
+    <description>甲方平台技术底座聚合工程。</description>
+
+    <modules>
+        <module>platform-bom</module>
+        <module>platform-parent</module>
+        <module>platform-common-core</module>
+        <module>platform-common-web</module>
+        <module>platform-common-data</module>
+        <module>platform-common-security-lite</module>
+        <module>platform-common-redis</module>
+        <module>platform-common-mq</module>
+        <module>platform-common-log</module>
+        <module>platform-common-id</module>
+    </modules>
+</project>

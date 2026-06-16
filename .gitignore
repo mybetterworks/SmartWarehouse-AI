@@ -6,9 +6,10 @@
 *.iws
 
 # OS files
-.DS_Store
+**/.DS_Store
 Thumbs.db
 desktop.ini
+*.hprof
 
 # Logs and temp files
 logs/
@@ -80,6 +81,7 @@ data/redis/
 data/rabbitmq/
 data/nacos/
 data/minio/
+data/temp/
 
 # Build and release artifacts
 *.jar

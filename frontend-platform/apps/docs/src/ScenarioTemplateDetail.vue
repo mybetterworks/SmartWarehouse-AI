@@ -15,9 +15,55 @@
     </div>
 
     <h2 id="basic-usage">基础用法</h2>
-    <div class="sw-doc-preview" :class="{ 'sw-doc-preview--layout': doc.slug === 'standard-layout' }">
-      <template v-if="doc.slug === 'standard-layout'">
-        <PlatformLayout title="SmartWarehouse-AI" :menus="menus" :breadcrumbs="breadcrumbs" :user="demoUser" active-path="/wms/material">
+    <div class="sw-doc-preview" :class="{ 'sw-doc-preview--layout': ['portal-workbench', 'standard-layout'].includes(doc.slug) }">
+      <template v-if="doc.slug === 'portal-workbench'">
+        <PlatformLayout
+          title="SmartWarehouse-AI"
+          brand-abbr="SW-AI"
+          :menus="[]"
+          :breadcrumbs="portalBreadcrumbs"
+          :user="demoUser"
+          :module-entries="moduleEntries"
+          show-workbench-drawer-button
+          show-module-drawer-trigger
+          :show-aside="false"
+        >
+          <PlatformPage title="Portal Workbench" description="The portal home keeps the content area full width and surfaces workbench modules only.">
+            <div class="sw-demo-grid">
+              <div class="sw-demo-panel">
+                <strong>Profile</strong>
+                <p>{{ demoUser.nickname }} / {{ demoUser.username }}</p>
+              </div>
+              <div class="sw-demo-panel">
+                <strong>Messages</strong>
+                <p>3 pending approvals, 2 inventory alerts</p>
+              </div>
+              <div class="sw-demo-panel">
+                <strong>Common Modules</strong>
+                <p>System Management, Warehouse Management</p>
+              </div>
+              <div class="sw-demo-panel">
+                <strong>Login Records</strong>
+                <p>Last sign-in: today 09:30 / Shanghai</p>
+              </div>
+            </div>
+          </PlatformPage>
+        </PlatformLayout>
+      </template>
+
+      <template v-else-if="doc.slug === 'standard-layout'">
+        <PlatformLayout
+          title="SW-AI"
+          brand-abbr="SW-AI"
+          :menus="menus"
+          :breadcrumbs="workbenchBreadcrumbs"
+          :user="demoUser"
+          :module-entries="moduleEntries"
+          active-module-code="sys"
+          show-workbench-drawer-button
+          show-module-drawer-trigger
+          v-model:collapsed="layoutCollapsed"
+        >
           <div class="sw-demo-panel">业务子应用内容区</div>
         </PlatformLayout>
       </template>
@@ -39,8 +85,8 @@
 
       <template v-else-if="doc.slug === 'query-table'">
         <PlatformSearchForm :model="queryModel">
-          <el-form-item label="关键字">
-            <el-input v-model="queryModel.keyword" placeholder="请输入" />
+          <el-form-item label="关键词">
+            <el-input v-model="queryModel.keyword" placeholder="请输入关键词" />
           </el-form-item>
         </PlatformSearchForm>
         <BatchOperationBar :selected-count="2">
@@ -126,6 +172,7 @@ import type {
   BreadcrumbItem,
   ChatBIColumn,
   ChatMessage,
+  FrontendModule,
   FormFieldSchema,
   ImportErrorRow,
   ImportTask,
@@ -177,17 +224,37 @@ const props = defineProps<{
   slug: string
 }>()
 
-// 场景模板与单组件文档分开维护，避免组件 API 文档被页面级组合示例污染。
 const doc = getScenarioTemplateDoc(props.slug)
 
-// 以下数据只用于展示组合模板效果，复制到业务项目后应替换为真实接口返回。
 const menus: NavMenuItem[] = [
   { id: 'sys', title: '系统管理', path: '/sys', moduleCode: 'sys' },
   { id: 'wms', title: '仓储管理', path: '/wms/material', moduleCode: 'wms' }
 ]
 
+const moduleEntries: FrontendModule[] = [
+  {
+    moduleCode: 'sys',
+    moduleName: '系统管理',
+    routePrefix: '/sys',
+    entryUrl: 'http://localhost:5175',
+    apiPrefix: '/api/sys',
+    ownerType: 'OWNER'
+  },
+  {
+    moduleCode: 'wms',
+    moduleName: '仓储管理',
+    routePrefix: '/wms',
+    entryUrl: 'http://localhost:5176',
+    apiPrefix: '/api/wms',
+    ownerType: 'VENDOR'
+  }
+]
+
+const portalBreadcrumbs: BreadcrumbItem[] = [{ title: '工作台', path: '/portal' }]
+const workbenchBreadcrumbs: BreadcrumbItem[] = [{ title: '工作台', path: '/portal' }, { title: '系统管理', path: '/sys/users' }]
 const breadcrumbs: BreadcrumbItem[] = [{ title: '首页', path: '/' }, { title: '物料管理' }]
 const demoUser: LoginUser = { userId: '1', username: 'admin', nickname: '平台管理员', roles: ['admin'], permissions: [] }
+const layoutCollapsed = ref(false)
 
 const riskState: LoginRiskState = {
   failureCount: 3,
@@ -262,7 +329,6 @@ const agentSteps: AgentStep[] = [{ id: 's1', title: '理解问题', status: 'suc
 const toolCalls: ToolCallRecord[] = [{ id: 't1', toolName: 'query_inventory_rank', serverName: 'mcp-business', status: 'success', durationMs: 86 }]
 
 function componentPath(componentName: string): string {
-  // 场景模板列出底层组件时链接回单组件文档，方便乙方继续查看 Props、Events 和注意事项。
   const item = componentCatalog.find((component) => component.name === componentName)
   return item?.docsPath ?? '/component/overview'
 }

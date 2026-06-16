@@ -6,21 +6,21 @@
 # ============================================================
 
 # 所有包从阿里云效私库下载（代理官方 npm，国内下载更快）
-registry=https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/
+registry=<SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY>
 
 # @smartwarehouse scope 的包发布和下载走这个地址
-@smartwarehouse:registry=https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/
+@smartwarehouse:registry=<SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY>
 
 # 认证 — 本地开发时填入真实 token
 always-auth=true
-//packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/:_authToken=${SMARTWAREHOUSE_SNAPSHOT_TOKEN}
-//packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/:_authToken=${SMARTWAREHOUSE_RELEASE_TOKEN}
+//<SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY_HOST_AND_PATH>/:_authToken=${SMARTWAREHOUSE_SNAPSHOT_TOKEN}
+//<SMARTWAREHOUSE_NPM_RELEASE_REGISTRY_HOST_AND_PATH>/:_authToken=${SMARTWAREHOUSE_RELEASE_TOKEN}
 
 # 二进制包国内镜像（加速 node-sass 等编译）
 sass_binary_site="https://npmmirror.com/mirrors/node-sass/"
 phantomjs_cdnurl="https://cdn.npmmirror.com/binaries/phantomjs"
 electron_mirror="https://cdn.npmmirror.com/binaries/electron/"
-sqlite3_binary_host_mirror="https://foxgis.oss-cn-shanghai.aliyuncs.com/"
+sqlite3_binary_host_mirror="<SQLITE3_BINARY_HOST_MIRROR>"
 chromedriver_cdnurl="https://cdn.npmmirror.com/binaries/chromedriver"
 
 # ============================================================

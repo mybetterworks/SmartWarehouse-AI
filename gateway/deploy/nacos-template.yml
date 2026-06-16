@@ -1,0 +1,13 @@
+server:
+  port: 9200
+
+smartwarehouse:
+  jwt:
+    secret: ${SMARTWAREHOUSE_JWT_SECRET}
+  gateway:
+    routes:
+      sys: ${SYS_SERVICE_URI}
+      wms: ${WMS_SERVICE_URI}
+      mes: ${MES_SERVICE_URI}
+      task: ${TASK_SERVICE_URI}
+      ai: ${AI_SERVICE_URI}

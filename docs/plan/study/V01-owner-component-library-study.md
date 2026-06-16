@@ -296,3 +296,14 @@ Q：为什么前端组件不能负责最终权限和数据权限？
 验证方式：rg 注释覆盖检查；corepack pnpm build 完整构建。
 后续优化：在 V02 之后的业务模块开发中，把“新增源码必须带中文职责说明和关键代码说明”纳入自动复盘检查。
 ```
+
+```text
+日期：2026-06-15
+复盘类型：V01 组件库布局能力继续演进
+完成内容：随着 V02 门户工作台与 hosted sys 布局改造落地，继续补强 `PlatformLayout` 的场景边界，新增无侧栏工作台、工作台按钮、模块抽屉、active module 高亮等 API，并在组件文档站增加 `portal-workbench` 与新版 `standard-layout` 模板。
+架构经验：布局组件如果已经承担“统一后台壳层”职责，就不能只保留普通后台页的 API 心智；必须同步把 host/standalone 边界、场景模板和文档入口一起升级。
+遇到问题：代码能力已经落地，但组件文档仍停留在旧版 `PlatformLayout + 导航` 口径，后续开发者很容易继续按旧心智使用。
+解决方式：把 `PlatformLayout` 新 props / events、host 专属入口隐藏规则、工作台模板和 hosted 标准后台模板同步写入 docs 源文件。
+验证方式：`corepack pnpm --filter @smartwarehouse/platform-ui typecheck`、`corepack pnpm --filter @smartwarehouse/component-docs build`。
+后续优化：如果后续 `wms-web`、`mes-web`、`ai-web` 也接入新的 standalone 壳层，应继续复用这套组件文档边界，不再把门户能力散落到具体业务页里。
+```

@@ -1,0 +1,29 @@
+body {
+  margin: 0;
+  background: #f5f7fb;
+  color: #1f2a44;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.vendor-app {
+  min-height: 100vh;
+  background: #f5f7fb;
+}
+
+.ai-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 16px;
+}
+
+.ai-side {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+@media (max-width: 900px) {
+  .ai-workbench {
+    grid-template-columns: 1fr;
+  }
+}

@@ -2,37 +2,27 @@
   <el-menu
     class="sw-side-menu"
     :default-active="activePath"
+    :default-openeds="defaultOpeneds"
     :collapse="collapsed"
     :collapse-transition="false"
     @select="handleSelect"
   >
-    <template v-for="menu in visibleMenus" :key="menu.id">
-      <el-sub-menu v-if="menu.children?.length" :index="menu.path">
-        <template #title>
-          <el-icon><MenuIcon /></el-icon>
-          <span>{{ menu.title }}</span>
-        </template>
-        <el-menu-item
-          v-for="child in getVisibleChildren(menu)"
-          :key="child.id"
-          :index="child.path"
-          @click="emit('menuClick', child)"
-        >
-          {{ child.title }}
-        </el-menu-item>
-      </el-sub-menu>
-      <el-menu-item v-else :index="menu.path" @click="emit('menuClick', menu)">
-        <el-icon><MenuIcon /></el-icon>
-        <template #title>{{ menu.title }}</template>
-      </el-menu-item>
-    </template>
+    <SideMenuNode
+      v-for="menu in visibleMenus"
+      :key="menu.id"
+      :menu="menu"
+      :resolve-menu-icon="resolveMenuIcon"
+      @menu-click="emit('menuClick', $event)"
+    />
   </el-menu>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { Menu as MenuIcon } from '@element-plus/icons-vue'
 import type { NavMenuItem } from '@smartwarehouse/platform-types'
+import { computed } from 'vue'
+import SideMenuNode from './SideMenuNode.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -52,16 +42,57 @@ const emit = defineEmits<{
   select: [path: string]
 }>()
 
-// 菜单权限已经由 sys-service 或门户层过滤，这里只做 visible 兜底，避免展示被标记隐藏的菜单项。
-const visibleMenus = computed(() => props.menus.filter((item) => item.visible !== false))
+const visibleMenus = computed(() => buildVisibleMenus(props.menus))
 
-function getVisibleChildren(menu: NavMenuItem): NavMenuItem[] {
-  // 子菜单也独立过滤，支持父菜单可见但部分按钮/页面对子角色隐藏的场景。
-  return (menu.children ?? []).filter((item) => item.visible !== false)
-}
+const defaultOpeneds = computed(() => {
+  if (props.collapsed || !props.activePath) {
+    return []
+  }
+  return findMenuPathChain(visibleMenus.value, props.activePath).slice(0, -1)
+})
 
 function handleSelect(path: string): void {
-  // select 只抛出路径，具体是否使用 Vue Router、微前端跳转或外链跳转由父级决定。
   emit('select', path)
+}
+
+function resolveMenuIcon(iconName?: string) {
+  if (!iconName) {
+    return MenuIcon
+  }
+  const directMatch = ElementPlusIconsVue[iconName as keyof typeof ElementPlusIconsVue]
+  if (directMatch) {
+    return directMatch
+  }
+  const normalizedName = iconName
+    .trim()
+    .replace(/(^|[-_\s]+)(\w)/g, (_, __, char: string) => char.toUpperCase())
+    .replace(/[^\w]/g, '')
+  return ElementPlusIconsVue[normalizedName as keyof typeof ElementPlusIconsVue] ?? MenuIcon
+}
+
+function buildVisibleMenus(menus: NavMenuItem[]): NavMenuItem[] {
+  return menus
+    .filter((item) => item.visible !== false)
+    .map((item) => ({
+      ...item,
+      children: item.children?.length ? buildVisibleMenus(item.children) : undefined
+    }))
+}
+
+function findMenuPathChain(menus: NavMenuItem[], targetPath: string, parents: string[] = []): string[] {
+  for (const menu of menus) {
+    const currentChain = [...parents, menu.path]
+    if (menu.path === targetPath) {
+      return currentChain
+    }
+    if (!menu.children?.length) {
+      continue
+    }
+    const matchedChain = findMenuPathChain(menu.children, targetPath, currentChain)
+    if (matchedChain.length) {
+      return matchedChain
+    }
+  }
+  return []
 }
 </script>

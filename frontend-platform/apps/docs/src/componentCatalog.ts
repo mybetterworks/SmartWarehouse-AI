@@ -537,12 +537,22 @@ function scenarioItem(
 
 export const scenarioTemplateCatalog: CatalogItemMeta[] = [
   scenarioItem({
+    slug: 'portal-workbench',
+    name: '门户工作台模板',
+    title: 'PlatformLayout + Workbench',
+    group: 'foundation',
+    description: '用于 portal-shell 的工作台首页：隐藏左侧菜单，保留统一顶部栏、工作台按钮和模块抽屉。右侧内容区用于承载个人信息、消息、常用模块、最近访问和登录记录。',
+    scenarios: ['门户工作台', '统一登录后首页', '模块总控制台'],
+    components: ['PlatformLayout', 'PlatformPage', 'UserDropdown'],
+    tags: ['layout', 'portal', 'workbench']
+  }),
+  scenarioItem({
     slug: 'standard-layout',
     name: '标准后台布局',
-    title: 'PlatformLayout + 导航',
+    title: 'PlatformLayout + Hosted Navigation',
     group: 'foundation',
-    description: '侧边菜单、顶部栏、面包屑、用户菜单和内容区组合，作为各业务前端的登录后外壳。',
-    scenarios: ['门户基座', '系统后台', '业务子应用'],
+    description: '用于进入具体业务模块后的统一后台布局：顶部固定工作台按钮、左上角模块抽屉、按当前 active module 切换侧边菜单。适用于 portal-shell 托管 remote 内容，也适用于 sys-web 独立模式复用同一布局能力。',
+    scenarios: ['Hosted sys-web', '门户内业务模块', '独立后台壳层'],
     components: ['PlatformLayout', 'SideMenu', 'BreadcrumbNav', 'UserDropdown'],
     tags: ['layout', 'template']
   }),

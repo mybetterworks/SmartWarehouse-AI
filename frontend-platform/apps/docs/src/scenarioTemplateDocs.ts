@@ -14,17 +14,91 @@ export interface ScenarioTemplateDoc {
 
 // 示例代码保持可复制的 Vue + TypeScript 片段，业务项目复制后再接入真实接口和权限编码。
 const scenarioCode: Record<string, string> = {
-  'standard-layout': `<script setup lang="ts">
-import { PlatformLayout } from '@smartwarehouse/platform-ui'
-import type { BreadcrumbItem, LoginUser, NavMenuItem } from '@smartwarehouse/platform-types'
+  'portal-workbench': `<script setup lang="ts">
+import { PlatformLayout, PlatformPage } from '@smartwarehouse/platform-ui'
+import type { FrontendModule, LoginUser } from '@smartwarehouse/platform-types'
 
-const menus: NavMenuItem[] = [{ id: 'sys', title: '系统管理', path: '/sys', moduleCode: 'sys' }]
-const breadcrumbs: BreadcrumbItem[] = [{ title: '首页' }, { title: '系统管理' }]
+const modules: FrontendModule[] = [
+  {
+    moduleCode: 'sys',
+    moduleName: '系统管理',
+    routePrefix: '/sys',
+    entryUrl: 'http://localhost:5175',
+    apiPrefix: '/api/sys',
+    ownerType: 'OWNER'
+  },
+  {
+    moduleCode: 'wms',
+    moduleName: '仓储管理',
+    routePrefix: '/wms',
+    entryUrl: 'http://localhost:5176',
+    apiPrefix: '/api/wms',
+    ownerType: 'VENDOR'
+  }
+]
 const user: LoginUser = { userId: '1', username: 'admin', nickname: '平台管理员', roles: ['admin'], permissions: [] }
 </script>
 
 <template>
-  <PlatformLayout :menus="menus" :breadcrumbs="breadcrumbs" :user="user">
+  <PlatformLayout
+    :user="user"
+    brand-abbr="SW-AI"
+    :menus="[]"
+    :breadcrumbs="[{ title: '工作台', path: '/portal' }]"
+    :module-entries="modules"
+    show-workbench-drawer-button
+    show-module-drawer-trigger
+    :show-aside="false"
+    @module-select="console.log('switch module', $event)"
+  >
+    <PlatformPage title="平台工作台" description="工作台首页不显示左侧菜单，只展示模块化控制台内容。">
+      <div>这里可以放个人信息、消息列表、常用模块、最近访问和登录记录。</div>
+    </PlatformPage>
+  </PlatformLayout>
+</template>`,
+  'standard-layout': `<script setup lang="ts">
+import { ref } from 'vue'
+import { PlatformLayout } from '@smartwarehouse/platform-ui'
+import type { BreadcrumbItem, FrontendModule, LoginUser, NavMenuItem } from '@smartwarehouse/platform-types'
+
+const menus: NavMenuItem[] = [{ id: 'sys-users', title: '用户管理', path: '/sys/users', moduleCode: 'sys' }]
+const breadcrumbs: BreadcrumbItem[] = [{ title: '工作台', path: '/portal' }, { title: '系统管理', path: '/sys/users' }]
+const modules: FrontendModule[] = [
+  {
+    moduleCode: 'sys',
+    moduleName: '系统管理',
+    routePrefix: '/sys',
+    entryUrl: 'http://localhost:5175',
+    apiPrefix: '/api/sys',
+    ownerType: 'OWNER'
+  },
+  {
+    moduleCode: 'wms',
+    moduleName: '仓储管理',
+    routePrefix: '/wms',
+    entryUrl: 'http://localhost:5176',
+    apiPrefix: '/api/wms',
+    ownerType: 'VENDOR'
+  }
+]
+const user: LoginUser = { userId: '1', username: 'admin', nickname: '平台管理员', roles: ['admin'], permissions: [] }
+const collapsed = ref(false)
+</script>
+
+<template>
+  <PlatformLayout
+    title="SW-AI"
+    brand-abbr="SW-AI"
+    :menus="menus"
+    :breadcrumbs="breadcrumbs"
+    :user="user"
+    :module-entries="modules"
+    active-module-code="sys"
+    show-workbench-drawer-button
+    show-module-drawer-trigger
+    v-model:collapsed="collapsed"
+    @module-select="console.log('switch module', $event)"
+  >
     <router-view />
   </PlatformLayout>
 </template>`,
@@ -161,7 +235,8 @@ const messages: ChatMessage[] = [{ id: 'm1', role: 'assistant', content: '你好
 const defaultNotes = [
   '场景模板用于说明多个底层组件如何协作，不替代单组件 API 文档。',
   '复制模板到业务项目后，应把接口调用、权限码和路由配置放到业务项目自己的边界内。',
-  '模板中出现的业务名词仅用于演示，组件本身不绑定 WMS、MES 或 AI 的具体后端实现。'
+  '模板中出现的业务名词仅用于演示，组件本身不绑定 WMS、MES 或 AI 的具体后端实现。',
+  'host 专属能力如“工作台”按钮和模块抽屉，在 standalone 子应用中默认应隐藏；不要暴露无法工作的空入口。'
 ]
 
 export const scenarioTemplateDocs: ScenarioTemplateDoc[] = scenarioTemplateCatalog.map((item) => ({

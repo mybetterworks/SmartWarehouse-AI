@@ -47,6 +47,7 @@ Jenkins
 4. Jenkins 负责本地构建、自动测试和测试环境发布。
 5. 阿里弹性容器负责正式环境部署和正式版本演示。
 6. 不要求本地安装 MySQL、Redis、RabbitMQ、Nacos、Sentinel、Seata、Nginx、Vector DB、MinIO 等服务。
+7. AI 可以按开发和验证需要操作本地 Docker Desktop，包括自动拉取镜像、构建镜像、启动或重启容器、执行容器内初始化脚本、运行健康检查脚本和读取容器日志。
 
 ## 3. Docker 与中间件规则
 
@@ -73,6 +74,11 @@ Jenkins
 5. 中间件容器用于开发验证，测试环境由 Jenkins 触发本地 Docker / Docker Compose 发布。
 6. 正式环境由阿里弹性容器部署正式镜像。
 7. K8s 相关设计仍作为多实例、无状态和云原生部署约束，但版本开发不等到最后才处理部署。
+8. AI 可以自动执行 `docker pull`、`docker build`、`docker compose up`、`docker compose config`、`docker logs`、容器健康检查和容器内初始化脚本，用于完成本地开发、联调、测试环境验证和问题排查。
+9. AI 执行 Docker 相关脚本前，应优先检查脚本内容是否包含真实账号、密码、token、私钥、内部地址或破坏性数据操作；如存在敏感信息，必须改为环境变量、Secret、Jenkins Credentials、`.example` 模板或本地忽略文件管理。
+10. 涉及删除容器卷、清空数据库、删除镜像、`docker system prune`、`docker volume prune`、重置中间件数据等可能造成数据丢失的操作，必须先向用户说明影响并获得明确确认。
+11. SmartWarehouse-AI 本地 Nacos 默认宿主机端口使用 `18848`，gRPC 默认宿主机端口使用 `19848`，避免和其他项目常见的 `8848/9848` 冲突；Docker Compose 网络内部仍使用 `nacos:8848`。
+12. gateway、sys-service、后续 wms-service、mes-service、task-service 等 Java 服务都必须接入 Nacos Discovery；本地直接启动时默认连接 `127.0.0.1:18848`，容器内启动时通过环境变量连接 `nacos:8848`。
 
 ## 4. Git 提交规则
 
@@ -227,6 +233,30 @@ V08 AI + 业务服务多方交互、正式发布加固
 7. 每个 milestone 已内置本版本的代码架构、业务功能、接口设计、数据库设计、前端页面、测试和验收要求，开发时应严格按当前 milestone 执行。
 8. 如果发现 milestone 描述缺失、过期或与当前实现冲突，应先修正 milestone 或向用户确认，再继续开发，避免凭记忆扩展范围。
 
+### 6.1 后端模块化开发规则
+
+1. 后端服务必须按业务模块拆分代码，不能把用户、角色、菜单、部门、岗位、字典、日志、风控等所有能力堆到一个 `Controller`、`Service` 或仓储文件里。
+2. `sys-service` 当前至少按认证、用户、角色、菜单、组织岗位、字典、前端模块、审计日志、风控记录等模块拆分 Controller；后续复杂度增加时继续拆分对应 Service、Repository/Mapper、DTO 和应用服务。
+3. WMS、MES、task 等后续服务也必须按业务域拆分，例如物料、仓库、库存、入库、出库、工单、物料申请、统计任务等分别维护接口、服务和持久化代码。
+4. 公共能力下沉到 `platform-common-*`，模块内部只保留自身业务规则；不得为了方便把跨模块逻辑复制到多个服务。
+5. 每个模块的关键类、方法和复杂逻辑都要补充中文注释，说明职责边界、业务规则、事务范围、缓存 Key、幂等设计和异常处理意图。
+
+### 6.2 前端模块化开发规则
+
+1. 前端应用必须按业务页面和模块拆分，不能把用户、角色、菜单、部门、字典、日志、风控等所有页面都写在一个 `App.vue` 中。
+2. `App.vue` 只负责应用级布局、登录态、壳层集成、路由或页面组合；具体业务页面应放入 `src/views`，接口调用放入 `src/api.ts` 或按模块拆分的 api 文件，复杂状态和复用逻辑放入 composables。
+3. `sys-web` 当前至少按用户管理、角色管理、菜单管理、部门岗位、字典管理、前端模块、审计日志、风控记录拆分页面；后续 WMS/MES/AI 前端也按业务域拆分页面。
+4. `portal-shell` 作为总控制台和 Module Federation host，系统管理、仓储、生产、AI 等模块必须在 `portal-shell` 所在域名和端口下通过前端路由访问。本地统一入口为 `http://localhost:5174/`，系统管理使用 `/sys/**`，后续 WMS/MES/AI 分别使用 `/wms/**`、`/mes/**`、`/ai/**`。
+5. `sys-web`、`wms-web`、`mes-web`、`ai-web` 作为 remote 独立开发、独立构建、独立部署，门户集成必须暴露 `./RemoteApp` 并在 `sys_frontend_module` 中维护 `remote_name`、`remote_entry`、`exposed_module`；不得把乙方前端作为 `portal-shell` 的构建期静态依赖。
+6. 乙方模块发布新版本时，只允许更新自己的前端静态制品和模块注册信息；不应要求甲方重新构建或发布 `portal-shell`。
+7. 门户和子应用集成禁止使用 iframe、`window.open` 新开页面、URL Token、`redirect` 参数跨端口跳转作为正式方案。只允许使用当前页面路由切换和运行时 remote 加载；登录态优先由同源 Token 存储、网关会话或 httpOnly Cookie 承载。
+8. 独立调试模式可以保留子项目自身登录页和 dev 端口，但不得影响门户集成模式；门户进入子应用后不应二次登录，不应离开 `5174`。
+9. 本地微前端集成验证优先使用 remote 构建产物加 preview 服务，例如 `http://localhost:5176/apps/wms/assets/remoteEntry.js`；普通 dev server 只用于子应用独立开发调试，不能当成正式模块制品入口。
+10. remote 加载失败、超时、404 或跨域异常时，`portal-shell` 必须显示当前模块降级页，不能拖垮门户、系统管理或其他 remote。
+11. 菜单和前端模块权限必须以后端接口过滤结果为准，前端只负责展示授权结果；不能只在前端隐藏无权限菜单后仍让接口返回全部模块。
+12. `sys-service` 承担统一认证中心职责，所有启用账号可以通过认证接口登录总门户，但这不代表拥有系统管理模块访问权；除 `/auth/**`、授权菜单树和授权模块列表外，系统管理接口必须校验 `ADMIN` 角色或 `sys:*` 权限。
+13. 前端页面仍必须优先通过 `@smartwarehouse/platform-ui`、`@smartwarehouse/platform-sdk`、`@smartwarehouse/platform-theme`、`@smartwarehouse/platform-types` 复用平台能力，不得跨项目使用源码相对路径导入。
+
 ## 7. Maven 与 npm 制品规则
 
 Maven 制品：
@@ -247,15 +277,17 @@ npm 制品：
 5. 稳定版本使用 release npm 仓库或 `latest` tag。
 6. 联调版本使用 snapshot npm 仓库或 `next` / `snapshot` tag。
 7. `.npmrc` 和 token 只允许用于构建阶段，不得进入最终镜像。
-8. 平台组件包变更时，必须同步维护 `frontend-platform/apps/docs` 企业组件文档站，公开入口固定为 `组件` 和 `场景模板`。
-9. `组件` 入口用于与业务无关的组件级目录和组件详情，新增组件必须更新 `/component/overview`、对应组件详情或总览状态。
-10. `场景模板` 入口用于多组件组合模板，原“大块功能组合展示”必须归入 `/scenario/overview`，不得继续混入组件级目录。
-11. `组件` 和 `场景模板` 的总览展示必须复用 `apps/docs/src/CatalogOverview.vue`，目录数据集中维护在 `apps/docs/src/componentCatalog.ts`，不得为两个入口复制两套卡片、分组和状态展示代码。
-12. 发布平台组件包前必须执行文档站构建，确保文档页从 `@smartwarehouse/platform-ui` 包入口导入成功。
-13. 组件详情页示例代码统一使用 Vue + TypeScript SFC 写法，标题标注为 `示例代码（Vue + TypeScript）`，Vue 示例代码块必须包含 `<script setup lang="ts">`。
-14. 文档站“基础用法”外层 Demo 容器保持统一宽度；窄组件使用内部 wrapper 控制展示尺寸，不得为了单个组件缩窄外层 `.sw-doc-preview`。
-15. AI、BI、SQL、JSON、Agent、MCP 工具调用等长内容组件必须在文档站中验证不撑破 Demo 容器，必要时同时调整组件样式和 VitePress theme 覆盖规则。
-16. 不再维护预设式静态 Playground；除非升级为可在线编辑代码并实时预览的真实 Playground，否则不得恢复 `/playground` 公开入口或新增 Playground 预设。
+8. AI 不允许自动向阿里云效 npm 私库推送 snapshot 或 release 制品，不允许自动执行 `publish:snapshot`、`publish:release`、`pnpm publish`、`npm publish` 等真实发布命令。
+9. 平台包版本号必须由用户手动设置；snapshot/release 制品发布必须由用户手动执行。AI 只能执行构建、类型检查、文档站构建、`publish --dry-run` 或生成发布操作说明。
+10. 平台组件包变更时，必须同步维护 `frontend-platform/apps/docs` 企业组件文档站，公开入口固定为 `组件` 和 `场景模板`。
+11. `组件` 入口用于与业务无关的组件级目录和组件详情，新增组件必须更新 `/component/overview`、对应组件详情或总览状态。
+12. `场景模板` 入口用于多组件组合模板，原“大块功能组合展示”必须归入 `/scenario/overview`，不得继续混入组件级目录。
+13. `组件` 和 `场景模板` 的总览展示必须复用 `apps/docs/src/CatalogOverview.vue`，目录数据集中维护在 `apps/docs/src/componentCatalog.ts`，不得为两个入口复制两套卡片、分组和状态展示代码。
+14. 发布平台组件包前必须执行文档站构建，确保文档页从 `@smartwarehouse/platform-ui` 包入口导入成功。
+15. 组件详情页示例代码统一使用 Vue + TypeScript SFC 写法，标题标注为 `示例代码（Vue + TypeScript）`，Vue 示例代码块必须包含 `<script setup lang="ts">`。
+16. 文档站“基础用法”外层 Demo 容器保持统一宽度；窄组件使用内部 wrapper 控制展示尺寸，不得为了单个组件缩窄外层 `.sw-doc-preview`。
+17. AI、BI、SQL、JSON、Agent、MCP 工具调用等长内容组件必须在文档站中验证不撑破 Demo 容器，必要时同时调整组件样式和 VitePress theme 覆盖规则。
+18. 不再维护预设式静态 Playground；除非升级为可在线编辑代码并实时预览的真实 Playground，否则不得恢复 `/playground` 公开入口或新增 Playground 预设。
 
 ## 8. Jenkins 与阿里弹性容器发布规则
 
@@ -323,6 +355,11 @@ Jenkins 发布要求：
 8. 从 V02 开始，每个版本都要记录阿里弹性容器正式发布检查结果。
 9. 验证结果写入 milestone 的“实现记录”。
 10. 平台组件库变更时，除包构建和 dry-run 外，还要验证 VitePress 文档站构建产物，必要时检查 `.vitepress/dist` 中关键页面内容。
+11. 自动测试必须尽量等同人工测试场景，尤其是后端服务、网关、登录鉴权、数据权限、MQ、Redis、数据库写入等链路，必须使用本地明确配置连接 Docker 中的真实数据库和中间件进行验证，不能只用 H2、Mock、内存仓库或 AI 临时 Shell 环境变量证明功能完成。
+12. 本地默认配置必须和 `deploy/local/docker-compose.yml` 暴露端口保持一致，开发者在 IDEA、Maven、命令行直接启动服务时，不应再额外修改数据库、Redis、RabbitMQ 等连接配置才能完成页面测试。
+13. 如果本地端口因为已有容器冲突而调整，必须同步更新 `application.yml` 默认值、`docker-compose.yml` 默认端口、README、当前 milestone、handle 和自动测试说明，确保“自动测试通过”后用户可以按同一套配置直接启动项目。
+14. Jenkins 自动测试前必须先启动或检查本版本依赖的本地 Docker 中间件；如果测试使用的配置和人工启动配置不同，必须先修正配置或测试流程，再记录版本完成。
+15. 允许保留单元测试中的 H2/Mock 用于快速验证纯逻辑，但版本验收结论必须以真实 Docker MySQL、Redis、RabbitMQ、网关、前端页面联调结果为准；如果真实中间件验收未通过，不得在实现记录中写“已完成并测试通过”。
 
 ## 11. 文档更新规则
 

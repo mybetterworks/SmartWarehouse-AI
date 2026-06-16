@@ -16,8 +16,8 @@
 ## 3. 执行步骤
 
 1. 确认当前项目是甲方 `frontend-platform` 还是乙方业务前端。
-2. 确认路由前缀：`/sys`、`/wms`、`/mes`、`/ai`。
-3. 确认静态资源入口：`/apps/sys/`、`/apps/wms/`、`/apps/mes/`、`/apps/ai/`。
+2. 确认门户统一路由前缀：`/sys`、`/wms`、`/mes`、`/ai`。
+3. 确认子项目独立调试入口和 Module Federation remote 入口是两套契约：独立 dev server 只服务开发调试，门户集成必须通过 `remoteEntry.js` 挂载到 `portal-shell` 的 `http://localhost:5174/<module>/**`。
 4. 所有请求通过 `platform-sdk` 访问 `/api/**`。
 5. 不写死后端 IP、端口或完整域名。
 6. 不跨项目相对路径引用源码。
@@ -46,6 +46,12 @@
 29. 多组件组合、大块业务片段、页面级模板统一通过 `ScenarioTemplateDetail.vue` 和 `scenarioTemplateDocs.ts` 维护，并放到 `/scenario/<slug>`。
 30. 旧组合路由如 `/component/business-selects`、`/component/dashboard`、`/component/ai-workbench` 只能作为迁移提示或兼容跳转，不再承载组合正文。
 31. 为 Vue 组件、组合式函数、SDK 方法、复杂 computed/watch、权限判断、运行时配置、请求拦截、组件 props 适配和关键交互流程补充详细中文注释，说明业务含义、设计原因和使用注意事项。
+32. 前端业务应用必须按页面和业务域拆分，不得把多个系统管理页面、业务表格、弹窗和接口调用全部集中在 `App.vue`。
+33. `App.vue` 只负责应用壳层、登录态、路由或页面组合；业务页面放入 `src/views`，接口调用放入 `src/api.ts` 或模块化 api 文件，复杂复用逻辑放入 composables。
+34. 作为门户总控制台时，模块入口必须在 `portal-shell` 所在域名和端口内通过前端路由切换，不使用 iframe、`window.open`、跨 dev server 跳转或 URL `redirect` 作为集成入口。
+35. 子应用如需被门户承载，应作为 Module Federation remote 暴露 `./RemoteApp`，并在 `sys_frontend_module` 注册 `remote_name`、`remote_entry`、`exposed_module`；禁止让 `portal-shell` 构建期静态依赖乙方应用。
+36. 门户向子应用同步登录态时，禁止把 Access Token 或 Refresh Token 放入 URL 查询参数。
+37. remote 加载必须有降级页和超时保护；某个乙方模块不可用时，不得影响门户、系统管理和其他模块。
 
 ## 4. 检查清单
 
@@ -78,6 +84,15 @@
 - [ ] Vue 示例代码块均包含 `<script setup lang="ts">`。
 - [ ] 未新增预设式静态 Playground；如恢复 Playground，必须是可在线编辑代码并实时预览样式的真实调试工具。
 - [ ] 组件、组合式函数、SDK 方法、关键交互逻辑、复杂状态计算和业务适配代码已有详细中文注释。
+- [ ] 业务页面是否已拆分到 `src/views` 或对应模块目录，`App.vue` 是否只承担应用壳层和组合职责。
+- [ ] 门户模块入口是否停留在 `portal-shell` 当前域名和端口，例如本地 `http://localhost:5174/sys/users`，且不使用 iframe、`window.open`、跨端口跳转或 URL Token。
+- [ ] `sys-web`、`wms-web`、`mes-web`、`ai-web` 是否暴露 `./RemoteApp` 并生成 `assets/remoteEntry.js`。
+- [ ] `sys_frontend_module` 是否维护了正确的 `remote_name`、`remote_entry`、`exposed_module`。
+- [ ] 本地集成是否使用 build + preview 验证 remoteEntry，例如 `/apps/wms/assets/remoteEntry.js` 返回 200。
+- [ ] 停止任一 remote 后，`portal-shell` 是否显示模块级降级页，其他模块是否仍可访问。
+- [ ] Token 同步是否避免 URL 参数；本地多端口开发是否通过 SDK localStorage + 同主机 Cookie 桥接，生产方案是否预留同源路径、网关会话或 httpOnly Cookie。
+- [ ] 菜单和模块权限是否以后端接口过滤结果为准，前端是否只展示授权模块。
+- [ ] 子应用独立登录或恢复会话后，是否校验当前账号是否具备本应用访问权限；没有权限时应清理 Token 并提示无访问权限。
 
 ## 5. 推荐提示词
 
@@ -112,6 +127,15 @@
 23. 场景模板正文继续放在组件入口，会让企业组件库退化为项目页面演示；组件入口只保留单组件文档，组合模板放 `/scenario/*`。
 24. VitePress preview 如果通过 pnpm script 透传参数失败，可能仍占用默认 4173；可进入 `apps/docs` 后直接使用 `corepack pnpm exec vitepress preview . --host 127.0.0.1 --port 4174`。
 25. 组件封装只写类型和实现、不写中文注释，后续学习时很难理解 props 设计、事件触发时机、权限判断、状态同步和样式覆盖的原因。
+26. 把用户、角色、菜单、部门、字典、日志等所有页面都写进一个 `App.vue`，会导致页面状态互相影响，也让后续多人协作、测试和维护变得困难。
+27. 门户点击模块时使用 `window.open` 打开新页面，会丢失总控制台上下文，并让用户误以为需要在每个子系统重复登录。
+28. 为了省事把 Token 拼到子应用 URL 中，可能被浏览器历史、代理日志、异常上报或截图泄露。
+29. 为了避免新开页面而改用 iframe，会让子应用调试、路由、样式、权限和浏览器工具链都变复杂；业务模块优先使用门户统一路由承载。
+30. 只在前端隐藏无权限菜单，但后端仍返回全部模块，会导致低权限账号通过接口或调试工具看到无权限入口。
+31. 子应用只判断“Token 有效”就进入后台，会让 WMS/MES/AI 账号直接登录 sys-web；必须额外判断当前应用所需权限。
+32. embedded/route 方案会让 `portal-shell` 构建期依赖子应用，乙方发版需要甲方重发门户；多乙方场景应使用 Module Federation remoteEntry 运行时加载。
+33. remoteEntry 路径要以发布制品的 Vite base 为准；本地 preview 通常是 `http://localhost:5176/apps/wms/assets/remoteEntry.js`，不是裸 `/assets/remoteEntry.js`。
+34. 只验证 remote 正常加载、不验证 remote 停止后的降级页，会漏掉门户稳定性问题。
 
 ## 7. 更新记录
 
@@ -176,4 +200,32 @@
 原因：用户确认当前 Playground 只能静态演示固定预设，不支持在线修改代码和实时显示样式，存在感不足且会让组件文档站功能显得混乱。
 修正：组件文档站流程从三入口调整为两入口：组件、场景模板；删除 Playground 预设维护要求；新增规则要求不得恢复预设式静态 Playground，除非升级为真实在线编辑实时预览工具。
 验证：corepack pnpm --filter @smartwarehouse/component-docs build 成功；后续完整构建、dry-run、preview HTTP 和浏览器验证结果写入 PROGRESS 与 milestone。
+```
+
+```text
+日期：2026-06-15
+原因：V02 商业化优化发现 portal-shell/sys-web 存在门户模块新开页面、个人菜单无动作、系统管理页面集中在 App.vue 的问题，不符合真实商业系统维护方式。
+修正：补充前端业务应用按 views/api/composables 拆分规则；门户模块入口必须使用正常页面跳转，不使用 iframe 或 window.open；本地登录态通过 SDK localStorage + 同主机 Cookie 桥接，禁止 URL 传 Token；个人信息和修改密码必须形成真实交互闭环。
+验证：portal-shell/sys-web 构建通过；浏览器验证 portal-shell 登录后点击“系统管理 -> 用户管理”跳转到 sys-web 并直接展示用户管理表格；`wms_manager` 登录后只显示仓储管理；个人信息和修改密码弹窗可打开。
+```
+
+```text
+日期：2026-06-15
+原因：发现 `wms_manager` 虽然门户菜单已过滤，但仍可直接打开 sys-web 并使用有效 Token 进入系统管理流程。
+修正：子应用独立登录和会话恢复时必须校验当前账号是否具备本应用权限；sys-web 要求 `ADMIN` 角色或 `sys:*` 权限，没有权限时清理 Token 并提示无系统管理访问权限。
+验证：portal-shell/sys-web 构建通过；后端测试覆盖 `wms_manager` 可登录认证中心但访问 `/api/sys/users` 返回 `FORBIDDEN`。
+```
+
+```text
+日期：2026-06-15
+原因：用户测试发现 portal-shell 进入系统管理仍跳转到 `localhost:5175/apps/sys/?redirect=...`，不符合所有前端服务统一在 `http://localhost:5174/` 通过路由访问的要求。
+修正：补充门户统一路由承载规则；子项目保留独立 dev server。该阶段曾要求门户集成提供 embedded/route 入口并挂载到 `portal-shell`，后续已经被 Module Federation remoteEntry 方案替代；SideMenu 一级目录点击也应能派发模块进入事件。
+验证：corepack pnpm build:packages 通过；portal-shell/sys-web 构建通过；浏览器验证 `/portal` 点击系统管理进入 `http://localhost:5174/sys/users`，点击角色管理进入 `http://localhost:5174/sys/roles`，未启动 `5175` 时门户集成仍可用。
+```
+
+```text
+日期：2026-06-15
+原因：用户要求前端项目改造为 vite-plugin-federation 微前端架构，乙方模块可独立更新部署且不重新构建 portal-shell。
+修正：将门户集成规则从 embedded/route 调整为 Module Federation host/remote；补充 remoteEntry 模块注册、build + preview 验证、远程加载失败降级页和超时保护检查。
+验证：portal-shell 构建通过；sys-web/wms-web/mes-web/ai-web remotes 构建通过；浏览器验证 `/sys/users`、`/wms`、`/mes`、`/ai` 可运行时加载，停止 AI remote 后门户显示降级页且 WMS 仍可访问。
 ```

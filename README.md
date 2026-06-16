@@ -119,6 +119,76 @@ http://localhost:5173/scenario/overview
 - 组件详情页已完成表格布局修复：Element Plus 表格表头与第一行无异常空白，表格、AI/BI、SQL、Agent、MCP 等长内容不会超出“基础用法”容器。
 - `frontend-platform` 源码已按学习友好规则补充中文注释，重点说明组件职责、业务边界、接口替换点和安全注意事项。
 
+### V02 甲方前后端基座与 CI/CD 基线
+
+V02 已完成甲方平台基座、网关、系统权限服务、统一门户、系统管理前端和发布基线。
+
+后端已完成：
+
+- `platform`：`platform-parent`、`platform-bom`、`platform-common-core/web/data/security-lite/redis/mq/log/id`。
+- `gateway/gateway-service`：`/api/sys/**` 路由、WMS/MES/task/AI 路由预留、Nacos 服务发现、`lb://sys-service` 负载路由、TraceId、CORS、JWT 鉴权、基础限流和降级响应。
+- `sys/sys-api`：认证、登录风控和系统管理 DTO 契约。
+- `sys/sys-service`：Nacos 服务注册，登录、退出、刷新 Token、当前用户、修改密码、拼图验证码、用户、角色、菜单、部门、岗位、字典、前端模块、数据权限、登录日志、操作日志和风控记录。
+- `sys-service` 代码已按用户、角色、菜单、组织岗位、字典、前端模块、审计日志、风控记录拆分 Controller，不再使用单个系统管理控制器承载所有接口。
+- 登录风控：连续失败 3 次启用随机拼图验证码，连续失败 5 次锁定账号 10 分钟。
+- 数据库脚本：`deploy/mysql/init-sys-db.sql` 提供 `smart_sys` 表结构。
+
+前端已完成：
+
+- `frontend-platform/apps/portal-shell`：统一登录页、后端拼图验证码联调、Token 管理、授权菜单装载、Module Federation host、微前端运行时加载、模块降级页、个人信息、修改密码和退出登录。
+- `frontend-platform/apps/sys-web`：支持独立登录和独立调试，同时作为 `smart_sys_web` remote 暴露 `./RemoteApp`，由 `portal-shell` 在 `/sys/**` 下运行时加载，提供用户、角色、菜单、部门岗位、字典、前端模块、审计日志、风控记录和仓库数据权限配置页面。
+- `wms-web`、`mes-web`、`ai-web`：已建立最小 Module Federation remote 骨架，分别暴露 `smart_wms_web`、`smart_mes_web`、`smart_ai_web`，后续乙方可独立更新自己的前端制品和模块注册信息。
+- `portal-shell` 进入系统管理或乙方模块时停留在 `http://localhost:5174/`，例如 `/portal` 点击系统管理后进入 `/sys/users`，点击 WMS/MES/AI 进入 `/wms`、`/mes`、`/ai`，不再 iframe 嵌套、不再新开浏览器页面、不再跳转到独立 dev server，也不要求二次登录。
+- `sys_frontend_module` 已支持 `remote_name`、`remote_entry`、`exposed_module`，作为门户运行时加载微前端的模块注册中心。
+- `sys-web` 页面已按业务域拆分到 `src/views`，`App.vue` 只负责应用壳层、登录态、模块切换和公共弹窗编排。
+- `portal-shell` 和 `sys-web` 均通过 `@smartwarehouse/*` 包名使用平台包，`package.json` 使用 `workspace:*`，代码不引用 `../../packages/**` 源码相对路径。
+- `LoginForm` 和 `JigsawCaptcha` 已增强为可接后端验证码 verifier 的通用登录风控组件，并同步更新组件文档。
+
+CI/CD 与部署基线：
+
+- `deploy/jenkins/Jenkinsfile`：覆盖 Java 测试、前端安装构建、Docker 镜像构建、本地 Docker Compose 测试发布和健康检查。
+- `deploy/local/docker-compose.yml`：提供 MySQL、Redis、Nacos、Sentinel、gateway-service、sys-service 本地集成配置。
+- `gateway/deploy/Dockerfile`、`sys/deploy/Dockerfile`、`frontend-platform/apps/portal-shell/deploy/Dockerfile`、`frontend-platform/apps/sys-web/deploy/Dockerfile`：提供服务镜像构建模板。
+- `deploy/aliyun-eci/formal-release-checklist.md`：记录阿里弹性容器正式发布检查清单。
+
+V02 验证命令：
+
+```powershell
+docker compose -f deploy/local/docker-compose.yml up -d mysql redis rabbitmq nacos
+mvn test -q
+mvn package -DskipTests -q
+
+cd frontend-platform
+corepack pnpm install
+corepack pnpm build
+cd ..
+
+docker compose -f deploy/local/docker-compose.yml config
+```
+
+V02 本地默认配置已经和 `deploy/local/docker-compose.yml` 对齐。直接启动 Java 服务时，`sys-service` 默认连接 Docker MySQL `127.0.0.1:13306`、Docker Redis `127.0.0.1:16381` 和 Nacos `127.0.0.1:18848`，`gateway` 默认连接 Docker Redis `127.0.0.1:16381` 和 Nacos `127.0.0.1:18848`，并通过 `lb://sys-service` 转发系统管理接口，不需要再额外修改数据库、Redis 或 Nacos 配置。
+
+```powershell
+java -jar sys/sys-service/target/sys-service-*.jar
+java -jar gateway/gateway-service/target/gateway-service-*.jar
+```
+
+联调结果：
+
+- `gateway-service` 和 `sys-service` 健康检查返回 `UP`。
+- 未登录访问 `/api/sys/users` 返回 `401`。
+- 登录成功返回 Access Token 和 Refresh Token。
+- 携带 Token 可访问 `/api/sys/auth/me` 和 `/api/sys/users`。
+- 连续 3 次错误登录后，`/api/sys/auth/risk-state?username=admin` 返回 `captchaRequired=true`。
+- `mvn test` 已包含 `LocalDockerMiddlewareAcceptanceTest`，会使用同一套默认配置连接真实 Docker MySQL/Redis，验证登录、模块查询和岗位增改删。
+
+说明：
+
+- V02 的 sys 数据、登录日志、操作日志、风控记录和前端模块注册已落库到 Docker MySQL；Token 黑名单、登录风控计数、验证码挑战和验证码通过 token 优先使用 Docker Redis。
+- H2 测试只用于快速验证基础逻辑，V02 验收结论以真实 Docker MySQL/Redis 和网关联调结果为准。
+- Docker 镜像构建检查曾因 Docker Hub 基础镜像网络连接超时阻塞；网络可用或配置镜像加速器后，可重试 Jenkinsfile 中的 Docker Build 阶段。
+- AI 不会自动向阿里云效 npm 私库推送 snapshot/release 制品，也不会自动执行 `pnpm publish` 或 `npm publish`。平台包版本号设置和真实发布必须由用户手动执行。
+
 ## 开发节奏
 
 项目按真实商用协作模式推进，不采用“先做完所有后端，再统一补前端”的方式。
@@ -158,4 +228,25 @@ V01 甲方组件库二次开发
 
 ## 当前状态
 
-当前 V01 甲方组件库二次开发与最小项目骨架已完成，已通过 `corepack pnpm build`、`corepack pnpm publish:dry-run` 和本地 preview HTTP 路由验证。组件文档站当前为“组件 / 场景模板”两入口企业组件库结构：`组件` 入口按底层组件独立展示且与业务组合解耦，`场景模板` 入口承载多组件组合模板，二者复用 `componentCatalog.ts` 和 `CatalogOverview.vue` 的总览能力，并分别通过 `ComponentDetail.vue`、`componentDocs.ts`、`ScenarioTemplateDetail.vue`、`scenarioTemplateDocs.ts` 管理详情页，避免后续重复维护。预设式静态 Playground 已删除；后续只有升级为支持在线修改代码并实时预览样式的真实 Playground 时才恢复。当前已完成表格布局、LoginForm 示例外框一致性、AI Workbench 长内容溢出、Vue + TypeScript 示例代码规范化、45 个组件独立详情页补齐，以及 `frontend-platform` 源码中文注释补强。下一步进入 V02 甲方前后端基座开发与 CI/CD 基线，重点推进 `platform`、`gateway`、`sys`、`frontend-platform/apps/portal-shell`、`frontend-platform/apps/sys-web`，并接入 Jenkins 测试环境和阿里弹性容器正式发布检查。
+当前 V01 甲方组件库二次开发与 V02 甲方前后端基座开发均已完成。V01 已完成企业组件库、组件文档站和源码中文注释补强；V02 已完成 `platform`、`gateway`、`sys`、`frontend-platform/apps/portal-shell`、`frontend-platform/apps/sys-web`、`wms-web`、`mes-web`、`ai-web` 的微前端 remote 骨架、Jenkins 测试发布基线和阿里弹性容器正式发布检查清单。已通过 `mvn -pl sys/sys-service -am test`、`corepack pnpm build:packages`、`corepack pnpm --filter @smartwarehouse/portal-shell build`、`corepack pnpm build:remotes`、真实 Docker MySQL/Redis/Nacos 验收测试、remoteEntry HTTP 检查和浏览器运行时加载/降级验证。下一步进入 V03 WMS 乙方前后端模块开发，重点在现有 `wms-web` remote 骨架上推进物料、仓库、库存、入库出库和离线上传闭环。
+
+
+## V02 最新补齐说明
+
+2026-06-14 已按商业系统标准对 V02 做二次补齐：sys-service 已连接 Docker MySQL 和 Redis，系统管理数据、日志、风控记录和前端模块注册均落库或写入共享中间件；gateway 与 sys-service 已完成双层 Token 鉴权和 Redis 黑名单校验；portal-shell 与 sys-web 已完成统一登录、模块入口和完整系统管理页面。
+
+已验证内容包括：Maven 测试与打包、真实 Docker MySQL/Redis/RabbitMQ 健康检查、`LocalDockerMiddlewareAcceptanceTest`、无额外环境变量的 sys-service/gateway 默认启动、网关接口联调、登录/退出/黑名单、三次失败启用拼图验证码、岗位增改删与操作日志、前端包构建、portal-shell/sys-web 浏览器页面验收和 compose 配置检查。Docker 镜像构建检查目前受 Docker Hub 基础镜像拉取网络超时阻塞，网络恢复或配置镜像加速器后可重试 docker compose -f deploy/local/docker-compose.yml build sys-service gateway-service。
+
+敏感信息处理也已同步：真实 .npmrc 继续由本地文件管理且被 .gitignore 忽略，.npmrc.example、V01 handle 和 frontend-platform/package.json 不再写死具体云效 npm registry 地址，真实地址与 token 通过本地 .npmrc、Jenkins Credentials 或环境变量注入。
+
+2026-06-15 已继续按商业软件架构标准优化 V02：gateway/sys-service 已接入 Nacos，Nacos 本地端口使用 `18848/19848` 避免冲突；gateway 默认通过 `lb://sys-service` 路由系统管理接口。portal-shell 登录后通过统一前端路由承载系统管理，访问路径保持在 `http://localhost:5174/sys/**`，不再使用 iframe、postMessage、URL Token、跨端口 `redirect` 或跳转到 `localhost:5175`，也不再二次登录。右上角个人信息和修改密码入口已补齐，修改密码后端接口为 `PUT /api/sys/auth/password`。sys-service 已拆分系统管理 Controller，sys-web 已拆分业务 views，后续功能开发继续按模块维护。
+
+本次优化已验证：`docker compose -f deploy/local/docker-compose.yml up -d mysql redis rabbitmq nacos`、`mvn -q -pl sys/sys-service,gateway/gateway-service -am test`、`mvn -q -pl sys/sys-service,gateway/gateway-service -am package -DskipTests`、`corepack pnpm build:packages`、`corepack pnpm --filter @smartwarehouse/portal-shell --filter @smartwarehouse/sys-web build` 均通过。浏览器验证中，`http://localhost:5174/` 已有登录态时规范到 `http://localhost:5174/portal`；点击左侧“系统管理”直接进入 `http://localhost:5174/sys/users`，点击系统管理内“角色管理”进入 `http://localhost:5174/sys/roles`；使用 `wms_manager / 123456` 登录后只显示“仓储管理”，不显示“系统管理”“生产执行”“运营看板”“AI 助手”。该阶段的 embedded 承载方式已被后续 Module Federation 运行时加载方案替代。
+
+2026-06-15 继续修复 V02 权限边界：`sys-service` 作为统一认证中心，允许 `wms_manager` 这类业务账号登录总门户，但系统管理接口已增加服务端授权兜底。除认证接口、授权菜单树和授权模块列表外，访问 sys 管理接口必须具备 `ADMIN` 角色或 `sys:*` 权限。已验证 `wms_manager / 123456` 可访问 `/api/sys/auth/me`，菜单和模块只返回 WMS，但访问 `/api/sys/users` 返回 `FORBIDDEN`；`sys-web` 独立登录时也会提示“当前账号无系统管理访问权限”。
+
+2026-06-15 已将 V02 前端基座升级为 `vite-plugin-federation` 微前端架构：`portal-shell` 作为 host 运行时加载 `sys-web`、`wms-web`、`mes-web`、`ai-web` remote，不再构建期静态依赖乙方前端。乙方发布新版本时，只需要发布自己的静态制品并更新 `sys_frontend_module.remote_entry` 等模块注册信息，不需要重新构建或发布 `portal-shell`。若某个 remote 加载失败或超时，门户会显示当前模块降级页，其他模块继续可用。
+
+本次微前端改造已验证：`corepack pnpm install`、`corepack pnpm build:packages`、`corepack pnpm --filter @smartwarehouse/portal-shell build`、`corepack pnpm build:remotes`、`mvn -pl sys/sys-service -am test` 均通过；临时 preview 验证四个 remoteEntry 均返回 200；浏览器验证 `/sys/users`、`/wms`、`/mes`、`/ai` 可在门户路由内运行时加载，停止 `ai-web` 后 `/ai` 显示降级页且 `/wms` 仍正常。
+
+微前端收口已完成：`sys-web` 不再暴露旧的 `@smartwarehouse/sys-web/embedded` 构建期入口，当前系统管理、WMS、MES、AI 前端模块统一通过 `remoteEntry.js` + `./RemoteApp` 运行时加载。最新复验已通过 `corepack pnpm build:packages`、`corepack pnpm --filter @smartwarehouse/portal-shell build`、`corepack pnpm build:remotes`、`mvn -pl sys/sys-service -am test`，并确认四个本地 preview remoteEntry 均返回 200；备用端口 `5184` 下 `/portal`、`/sys/users`、`/wms`、`/mes`、`/ai` 的 SPA 路由 HTTP 检查均返回 200。

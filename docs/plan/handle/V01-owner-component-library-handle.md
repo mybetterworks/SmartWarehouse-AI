@@ -532,34 +532,34 @@ process.exit(bad.length ? 1 : 0);
 - 到阿里云效中下载snapshot和release库的npmrc文件，将两个文件内容按照下方格式进行合并，放到frontend-platform根目录下，并重命名为.npmrc
 ```text
 # 所有包从阿里云效私库下载（它代理了官方 npm）
-registry=https://packages.aliyun.com/xxxxxxxxxxxx/npm/repo-qbic/
+registry=<SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY>
 
 # 认证
 always-auth=true
 
 # snapshot 仓库的 token
-//packages.aliyun.com/xxxxxxxxxxxx/npm/repo-qbic/:_authToken=你的真实token
+//<SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY_HOST_AND_PATH>/:_authToken=<NPM_TOKEN>
 
 # release 仓库的 token
-//packages.aliyun.com/xxxxxxxxxxxx/npm/repo-dmjby/:_authToken=你的真实token
+//<SMARTWAREHOUSE_NPM_RELEASE_REGISTRY_HOST_AND_PATH>/:_authToken=<NPM_TOKEN>
 
 # 二进制包国内镜像（加速 node-sass 等编译）
 sass_binary_site="https://npmmirror.com/mirrors/node-sass/"
 phantomjs_cdnurl="https://cdn.npmmirror.com/binaries/phantomjs"
 electron_mirror="https://cdn.npmmirror.com/binaries/electron/"
-sqlite3_binary_host_mirror="https://foxgis.oss-cn-shanghai.aliyuncs.com/"
+sqlite3_binary_host_mirror="<SQLITE3_BINARY_HOST_MIRROR>"
 chromedriver_cdnurl="https://cdn.npmmirror.com/binaries/chromedriver"
 ```
 - 修改packages下每个子包的package.json，删除publishConfig.registry字段，改为在.npmrc中统一配置registry地址
 - 在frontend-platform目录下的package.json文件中的scripts下，添加发布脚本
 ```json
-    "publish:dry-run:snapshot": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks --dry-run",
+    "publish:dry-run:snapshot": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry <SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY> --tag snapshot --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry <SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY> --tag snapshot --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry <SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY> --tag snapshot --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry <SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY> --tag snapshot --no-git-checks --dry-run",
 
-    "publish:dry-run:release": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks --dry-run",
+    "publish:dry-run:release": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry <SMARTWAREHOUSE_NPM_RELEASE_REGISTRY> --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry <SMARTWAREHOUSE_NPM_RELEASE_REGISTRY> --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry <SMARTWAREHOUSE_NPM_RELEASE_REGISTRY> --no-git-checks --dry-run && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry <SMARTWAREHOUSE_NPM_RELEASE_REGISTRY> --no-git-checks --dry-run",
 
-    "publish:snapshot": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/ --tag snapshot --no-git-checks",
+    "publish:snapshot": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry <SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY> --tag snapshot --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry <SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY> --tag snapshot --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry <SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY> --tag snapshot --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry <SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY> --tag snapshot --no-git-checks",
 
-    "publish:release": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-dmjby/ --no-git-checks",
+    "publish:release": "corepack pnpm --filter @smartwarehouse/platform-types publish --registry <SMARTWAREHOUSE_NPM_RELEASE_REGISTRY> --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-theme publish --registry <SMARTWAREHOUSE_NPM_RELEASE_REGISTRY> --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-sdk publish --registry <SMARTWAREHOUSE_NPM_RELEASE_REGISTRY> --no-git-checks && corepack pnpm --filter @smartwarehouse/platform-ui publish --registry <SMARTWAREHOUSE_NPM_RELEASE_REGISTRY> --no-git-checks",
 ```
 2.发布
 - cd E:\Code\codex\SmartWarehouse-AI\frontend-platform
@@ -595,14 +595,14 @@ chromedriver_cdnurl="https://cdn.npmmirror.com/binaries/chromedriver"
   - cd E:\Code\temp\test-smartwarehouse-ui
 
   - corepack pnpm init
-  - npm config set @smartwarehouse:registry "https://packages.aliyun.com/62b95dfe487c500c27f679ef/npm/repo-qbic/"
+  - npm config set @smartwarehouse:registry "<SMARTWAREHOUSE_NPM_SNAPSHOT_REGISTRY>"
   - corepack pnpm add @smartwarehouse/platform-ui@snapshot @smartwarehouse/platform-sdk@snapshot @smartwarehouse/platform-theme@snapshot @smartwarehouse/platform-types@snapshot
   能安装成功，就说明云效 npm 私库发布链路打通了。
 - 发布 release 版验证
   - mkdir E:\Code\temp\test-smartwarehouse-ui-release
   - cd E:\Code\temp\test-smartwarehouse-ui-release
   - corepack pnpm init
-  - npm config set @smartwarehouse:registry "https://packages.aliyun.com/xxxxxxxxxxxxx/npm/repo-qbic-release/"
+  - npm config set @smartwarehouse:registry "<SMARTWAREHOUSE_NPM_RELEASE_REGISTRY>"
   - corepack pnpm add @smartwarehouse/platform-ui@latest @smartwarehouse/platform-sdk@latest @smartwarehouse/platform-theme@latest @smartwarehouse/platform-types@latest
 - 更新 snapshot 版验证
   - cd E:\Code\temp\test-smartwarehouse-ui
@@ -618,3 +618,23 @@ chromedriver_cdnurl="https://cdn.npmmirror.com/binaries/chromedriver"
 测试通过后 → 发布 release v0.1.0
 然后开始开发 → v0.2.0-snapshot.1
 
+## 11. 门户工作台布局升级补充
+
+当 V02 及后续版本需要把门户工作台、模块抽屉和统一后台壳层能力下沉到组件库时，优先检查以下文件：
+
+```text
+frontend-platform/packages/platform-types/src/index.ts
+frontend-platform/packages/platform-ui/src/components/PlatformLayout/PlatformLayout.vue
+frontend-platform/apps/docs/src/componentDocs.ts
+frontend-platform/apps/docs/src/componentCatalog.ts
+frontend-platform/apps/docs/src/scenarioTemplateDocs.ts
+```
+
+补充规则：
+
+1. `PlatformLayout` 新增 props 或 events 后，必须同步更新组件详情文档。
+2. 如果布局能力已经上升为“页面级最佳实践”，要同时补场景模板，而不是只改单组件 API 表。
+3. host 专属能力如工作台按钮、模块抽屉，必须在文档中明确说明 standalone 子应用默认隐藏。
+4. 布局升级后至少执行一次：
+   - `corepack pnpm --filter @smartwarehouse/platform-ui typecheck`
+   - `corepack pnpm --filter @smartwarehouse/component-docs build`

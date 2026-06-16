@@ -1,0 +1,82 @@
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+  }
+
+  environment {
+    MAVEN_OPTS = '-Dfile.encoding=UTF-8'
+    NODE_OPTIONS = '--max-old-space-size=4096'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Local Middleware Up') {
+      steps {
+        // 自动测试必须和人工启动使用同一套本地明确配置，先启动 SmartWarehouse-AI 专属中间件。
+        bat 'docker compose -f deploy/local/docker-compose.yml up -d mysql redis rabbitmq nacos'
+        bat 'docker compose -f deploy/local/docker-compose.yml ps'
+      }
+    }
+
+    stage('Java Test') {
+      steps {
+        bat 'mvn test'
+      }
+    }
+
+    stage('Frontend Install') {
+      steps {
+        dir('frontend-platform') {
+          bat 'corepack pnpm install --frozen-lockfile'
+        }
+      }
+    }
+
+    stage('Frontend Build') {
+      steps {
+        dir('frontend-platform') {
+          bat 'corepack pnpm build'
+        }
+      }
+    }
+
+    stage('Docker Build') {
+      steps {
+        bat 'docker build -f gateway/deploy/Dockerfile -t smartwarehouse/gateway-service:%BUILD_NUMBER% .'
+        bat 'docker build -f sys/deploy/Dockerfile -t smartwarehouse/sys-service:%BUILD_NUMBER% .'
+        bat 'docker build -f frontend-platform/apps/portal-shell/deploy/Dockerfile -t smartwarehouse/portal-shell:%BUILD_NUMBER% .'
+        bat 'docker build -f frontend-platform/apps/sys-web/deploy/Dockerfile -t smartwarehouse/sys-web:%BUILD_NUMBER% .'
+      }
+    }
+
+    stage('Local Test Deploy') {
+      steps {
+        dir('deploy/local') {
+          bat 'docker compose up -d'
+        }
+      }
+    }
+
+    stage('Health Check') {
+      steps {
+        bat 'curl -f http://127.0.0.1:9200/actuator/health'
+        bat 'curl -f http://127.0.0.1:9201/actuator/health'
+      }
+    }
+  }
+
+  post {
+    always {
+      archiveArtifacts artifacts: '**/target/*.jar,frontend-platform/apps/*/dist/**', allowEmptyArchive: true
+      junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+    }
+  }
+}

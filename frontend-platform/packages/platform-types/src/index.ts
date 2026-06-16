@@ -56,11 +56,13 @@ export interface LoginRiskState {
 
 // 菜单项来自 sys-service，既支撑路由渲染，也支撑不同角色看到不同菜单。
 export interface MenuItem {
-  id: string
-  parentId?: string
+  id: string | number
+  parentId?: string | number
   moduleCode: ModuleCode
-  name: string
+  name?: string
+  menuName?: string
   path: string
+  icon?: string
   component?: string
   permission?: string
   visible: boolean
@@ -68,7 +70,7 @@ export interface MenuItem {
 }
 
 export interface NavMenuItem {
-  id: string
+  id: string | number
   title: string
   path: string
   icon?: string
@@ -91,6 +93,40 @@ export interface FrontendModule {
   entryUrl: string
   apiPrefix: string
   ownerType: OwnerType
+  ownerName?: string
+  status?: string
+  sortNo?: number
+  // 微前端运行时加载字段由 sys-service 模块注册中心维护，乙方发版时只更新 remoteEntry 即可切换版本。
+  remoteName?: string
+  remoteEntry?: string
+  exposedModule?: string
+}
+
+export interface PortalNotice {
+  id: string | number
+  title: string
+  content: string
+  level: 'info' | 'warning' | 'danger' | 'success' | string
+  publishedTime?: string
+}
+
+export interface PortalProfile {
+  userId: string
+  username: string
+  nickname: string
+  roles: string[]
+  permissions: string[]
+  warehouseIds?: string[]
+  lastLoginTime?: string
+  lastLoginIp?: string
+}
+
+export interface PortalWorkbench {
+  profile: PortalProfile
+  notices: PortalNotice[]
+  commonModules: FrontendModule[]
+  recentModules: FrontendModule[]
+  loginRecords: Array<Record<string, unknown>>
 }
 
 export interface DictOption {

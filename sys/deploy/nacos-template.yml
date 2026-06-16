@@ -1,0 +1,9 @@
+server:
+  port: 9201
+
+smartwarehouse:
+  jwt:
+    secret: ${SMARTWAREHOUSE_JWT_SECRET}
+  sys:
+    worker-id: ${SMARTWAREHOUSE_SYS_WORKER_ID}
+    default-admin-password: ${SMARTWAREHOUSE_DEMO_PASSWORD}

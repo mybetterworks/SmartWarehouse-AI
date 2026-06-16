@@ -1,0 +1,50 @@
+server:
+  port: 9201
+
+spring:
+  application:
+    name: sys-service
+  datasource:
+    # 本地默认值直接连接 deploy/local/docker-compose.yml 暴露的 SmartWarehouse-AI 专属 MySQL。
+    # Docker 容器部署时由 compose 注入 mysql:3306，正式环境由环境变量或配置中心覆盖。
+    url: ${SMARTWAREHOUSE_SYS_DATASOURCE_URL:jdbc:mysql://127.0.0.1:13306/smart_sys?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
+    username: ${SMARTWAREHOUSE_SYS_DATASOURCE_USERNAME:smart_sys}
+    password: ${SMARTWAREHOUSE_SYS_DATASOURCE_PASSWORD:smart_sys_dev}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${SMARTWAREHOUSE_REDIS_HOST:127.0.0.1}
+      # 本地默认值直接连接 SmartWarehouse-AI 专属 Redis，避免误连其他项目的 6379/16380。
+      port: ${SMARTWAREHOUSE_REDIS_PORT:16381}
+      password: ${SMARTWAREHOUSE_REDIS_PASSWORD:}
+      timeout: 3s
+  sql:
+    init:
+      mode: never
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${SMARTWAREHOUSE_NACOS_SERVER_ADDR:127.0.0.1:18848}
+        namespace: ${SMARTWAREHOUSE_NACOS_NAMESPACE:}
+        group: ${SMARTWAREHOUSE_NACOS_GROUP:DEFAULT_GROUP}
+        enabled: ${SMARTWAREHOUSE_NACOS_DISCOVERY_ENABLED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+smartwarehouse:
+  jwt:
+    secret: ${SMARTWAREHOUSE_JWT_SECRET:change-me-in-local-dev-only-at-least-32-chars}
+    access-ttl-seconds: 7200
+    refresh-ttl-seconds: 604800
+  sys:
+    worker-id: ${SMARTWAREHOUSE_SYS_WORKER_ID:1}
+    # 数据库初始化脚本会写入本地演示账号；该配置只作为测试或临时初始化兜底。
+    default-admin-password: ${SMARTWAREHOUSE_DEMO_PASSWORD:123456}

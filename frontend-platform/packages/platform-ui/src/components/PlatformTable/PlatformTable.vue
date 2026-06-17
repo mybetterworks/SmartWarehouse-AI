@@ -6,6 +6,9 @@
       :data="data"
       :row-key="rowKey"
       :height="height"
+      :tree-props="treeProps"
+      :default-expand-all="defaultExpandAll"
+      :expand-row-keys="expandRowKeys"
       stripe
       border
       @selection-change="emit('selectionChange', $event)"
@@ -39,7 +42,9 @@
 
       <el-table-column v-if="$slots.actions" label="操作" fixed="right" :width="actionsWidth" align="center">
         <template #default="scope">
-          <slot name="actions" :row="scope.row" />
+          <div class="sw-table__actions">
+            <slot name="actions" :row="scope.row" />
+          </div>
         </template>
       </el-table-column>
 
@@ -79,6 +84,9 @@ const props = withDefaults(
     actionsWidth?: string | number
     pageSizes?: number[]
     height?: string | number
+    treeProps?: Record<string, string>
+    defaultExpandAll?: boolean
+    expandRowKeys?: Array<string | number>
   }>(),
   {
     loading: false,
@@ -87,7 +95,10 @@ const props = withDefaults(
     selectable: false,
     showIndex: false,
     actionsWidth: 160,
-    pageSizes: () => [10, 20, 50, 100]
+    pageSizes: () => [10, 20, 50, 100],
+    treeProps: () => ({}),
+    defaultExpandAll: false,
+    expandRowKeys: undefined
   }
 )
 

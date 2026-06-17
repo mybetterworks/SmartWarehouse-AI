@@ -34,10 +34,10 @@
         :data="users"
         :loading="loading"
         :pagination="pagination"
+        :show-index="false"
         row-key="id"
         selectable
-        show-index
-        actions-width="240"
+        actions-width="208"
         height="100%"
         @page-change="handlePageChange"
         @selection-change="handleSelectionChange"

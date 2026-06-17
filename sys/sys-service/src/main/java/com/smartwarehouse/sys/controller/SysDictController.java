@@ -4,8 +4,10 @@ import com.smartwarehouse.platform.core.PageQuery;
 import com.smartwarehouse.platform.core.PageResult;
 import com.smartwarehouse.platform.core.R;
 import com.smartwarehouse.platform.log.OperationLog;
+import com.smartwarehouse.sys.api.SysDtos.DictItemQueryRequest;
 import com.smartwarehouse.sys.api.SysDtos.DictItemSaveRequest;
 import com.smartwarehouse.sys.api.SysDtos.DictItemView;
+import com.smartwarehouse.sys.api.SysDtos.DictTypeQueryRequest;
 import com.smartwarehouse.sys.api.SysDtos.DictTypeSaveRequest;
 import com.smartwarehouse.sys.api.SysDtos.DictTypeView;
 import com.smartwarehouse.sys.application.SysManagementService;
@@ -18,8 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * 字典管理接口。
@@ -36,8 +36,14 @@ public class SysDictController {
 
     @GetMapping("/dict-types")
     public R<PageResult<DictTypeView>> dictTypes(@RequestParam(required = false) Integer pageNo,
-                                                 @RequestParam(required = false) Integer pageSize) {
-        return R.ok(service.dictTypes(PageQuery.of(pageNo, pageSize)));
+                                                 @RequestParam(required = false) Integer pageSize,
+                                                 @RequestParam(required = false) String dictCode,
+                                                 @RequestParam(required = false) String dictName,
+                                                 @RequestParam(required = false) String status) {
+        return R.ok(service.dictTypes(
+                PageQuery.of(pageNo, pageSize),
+                new DictTypeQueryRequest(dictCode, dictName, status)
+        ));
     }
 
     @PostMapping("/dict-types")
@@ -60,8 +66,16 @@ public class SysDictController {
     }
 
     @GetMapping("/dict-items")
-    public R<List<DictItemView>> dictItems(@RequestParam String dictCode) {
-        return R.ok(service.dictItems(dictCode));
+    public R<PageResult<DictItemView>> dictItems(@RequestParam(required = false) Integer pageNo,
+                                                 @RequestParam(required = false) Integer pageSize,
+                                                 @RequestParam(required = false) String dictCode,
+                                                 @RequestParam(required = false) String itemLabel,
+                                                 @RequestParam(required = false) String itemValue,
+                                                 @RequestParam(required = false) String status) {
+        return R.ok(service.dictItems(
+                PageQuery.of(pageNo, pageSize),
+                new DictItemQueryRequest(dictCode, itemLabel, itemValue, status)
+        ));
     }
 
     @PostMapping("/dict-items")

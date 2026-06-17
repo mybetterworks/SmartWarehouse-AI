@@ -29,17 +29,17 @@
       <el-form-item label="邮箱"><el-input v-model="sys.userForm.email" /></el-form-item>
       <el-form-item label="部门">
         <el-select v-model="sys.userForm.deptId" clearable filterable>
-          <el-option v-for="item in flattenTree(sys.state.depts)" :key="item.id" :label="String(item.deptName)" :value="item.id" />
+          <el-option v-for="item in flattenTree(sys.deptTreeOptions)" :key="item.id" :label="String(item.deptName)" :value="item.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="岗位">
         <el-select v-model="sys.userForm.postId" clearable filterable>
-          <el-option v-for="item in sys.state.posts" :key="item.id" :label="String(item.postName)" :value="item.id" />
+          <el-option v-for="item in sys.postOptions" :key="item.id" :label="String(item.postName)" :value="item.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="角色">
         <el-select v-model="sys.userRoleIds" multiple clearable filterable>
-          <el-option v-for="role in sys.state.roles" :key="role.id" :label="role.roleName" :value="role.id" />
+          <el-option v-for="role in sys.roleOptions" :key="role.id" :label="role.roleName" :value="role.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
@@ -81,7 +81,7 @@
   </el-dialog>
 
   <el-dialog v-model="sys.roleMenuDialogVisible" title="角色菜单授权" width="560px">
-    <el-tree ref="roleMenuTreeRef" :data="sys.state.menus" node-key="id" show-checkbox default-expand-all :props="{ label: 'menuName', children: 'children' }" />
+    <el-tree ref="roleMenuTreeRef" :data="sys.menuTreeOptions" node-key="id" show-checkbox default-expand-all :props="{ label: 'menuName', children: 'children' }" />
     <template #footer>
       <el-button @click="sys.roleMenuDialogVisible = false">取消</el-button>
       <el-button type="primary" @click="sys.saveRoleMenus">保存</el-button>
@@ -101,7 +101,7 @@
       <el-form-item label="上级菜单">
         <el-select v-model="sys.menuForm.parentId" filterable>
           <el-option label="根菜单" :value="0" />
-          <el-option v-for="item in flattenTree(sys.state.menus)" :key="item.id" :label="String(item.menuName)" :value="item.id" />
+          <el-option v-for="item in flattenTree(sys.menuTreeOptions)" :key="item.id" :label="String(item.menuName)" :value="item.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="菜单名称"><el-input v-model="sys.menuForm.menuName" /></el-form-item>
@@ -137,7 +137,7 @@
       <el-form-item label="上级部门">
         <el-select v-model="sys.deptForm.parentId" filterable>
           <el-option label="根部门" :value="0" />
-          <el-option v-for="item in flattenTree(sys.state.depts)" :key="item.id" :label="String(item.deptName)" :value="item.id" />
+          <el-option v-for="item in flattenTree(sys.deptTreeOptions)" :key="item.id" :label="String(item.deptName)" :value="item.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="部门编码"><el-input v-model="sys.deptForm.deptCode" /></el-form-item>

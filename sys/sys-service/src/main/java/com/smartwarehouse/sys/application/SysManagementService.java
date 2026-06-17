@@ -46,8 +46,12 @@ public class SysManagementService {
         repository.updateUserWarehouses(id, request.ids());
     }
 
-    public PageResult<RoleView> roles(PageQuery query) {
-        return repository.pageRoles(query);
+    public PageResult<RoleView> roles(PageQuery query, RoleQueryRequest request) {
+        return repository.pageRoles(query, request);
+    }
+
+    public List<RoleView> allRoles() {
+        return repository.listRoles();
     }
 
     public RoleView saveRole(Long id, RoleSaveRequest request) {
@@ -66,6 +70,10 @@ public class SysManagementService {
         return repository.menuTree();
     }
 
+    public PageResult<MenuView> menus(PageQuery query, MenuQueryRequest request) {
+        return repository.pageMenus(query, request);
+    }
+
     public List<MenuView> menuTreeForUser(Long userId) {
         return repository.menuTreeForUser(userId);
     }
@@ -82,6 +90,10 @@ public class SysManagementService {
         return repository.deptTree();
     }
 
+    public PageResult<DeptView> depts(PageQuery query, DeptQueryRequest request) {
+        return repository.pageDepts(query, request);
+    }
+
     public DeptView saveDept(Long id, DeptSaveRequest request) {
         return repository.saveDept(id, request);
     }
@@ -90,8 +102,12 @@ public class SysManagementService {
         repository.deleteDept(id);
     }
 
-    public PageResult<PostView> posts(PageQuery query) {
-        return repository.pagePosts(query);
+    public PageResult<PostView> posts(PageQuery query, PostQueryRequest request) {
+        return repository.pagePosts(query, request);
+    }
+
+    public List<PostView> allPosts() {
+        return repository.listPosts();
     }
 
     public PostView savePost(Long id, PostSaveRequest request) {
@@ -102,8 +118,8 @@ public class SysManagementService {
         repository.deletePost(id);
     }
 
-    public PageResult<DictTypeView> dictTypes(PageQuery query) {
-        return repository.pageDictTypes(query);
+    public PageResult<DictTypeView> dictTypes(PageQuery query, DictTypeQueryRequest request) {
+        return repository.pageDictTypes(query, request);
     }
 
     public DictTypeView saveDictType(Long id, DictTypeSaveRequest request) {
@@ -114,8 +130,8 @@ public class SysManagementService {
         repository.deleteDictType(id);
     }
 
-    public List<DictItemView> dictItems(String dictCode) {
-        return repository.listDictItems(dictCode);
+    public PageResult<DictItemView> dictItems(PageQuery query, DictItemQueryRequest request) {
+        return repository.pageDictItems(query, request);
     }
 
     public DictItemView saveDictItem(Long id, DictItemSaveRequest request) {
@@ -126,8 +142,8 @@ public class SysManagementService {
         repository.deleteDictItem(id);
     }
 
-    public PageResult<FrontendModuleView> frontendModules(PageQuery query) {
-        return repository.pageFrontendModules(query);
+    public PageResult<FrontendModuleView> frontendModules(PageQuery query, FrontendModuleQueryRequest request) {
+        return repository.pageFrontendModules(query, request);
     }
 
     public List<FrontendModuleView> enabledFrontendModules() {
@@ -160,15 +176,15 @@ public class SysManagementService {
         repository.appendPortalAccessLog(userId, request.moduleCode(), request.routePath());
     }
 
-    public List<LoginLogView> loginLogs() {
-        return repository.loginLogs();
+    public PageResult<LoginLogView> loginLogs(PageQuery query, LoginLogQueryRequest request) {
+        return repository.pageLoginLogs(query, request);
     }
 
-    public List<OperLogView> operLogs() {
-        return repository.operLogs();
+    public PageResult<OperLogView> operLogs(PageQuery query, OperLogQueryRequest request) {
+        return repository.pageOperLogs(query, request);
     }
 
-    public List<RiskRecordView> riskRecords() {
-        return repository.riskRecords();
+    public PageResult<RiskRecordView> riskRecords(PageQuery query, RiskRecordQueryRequest request) {
+        return repository.pageRiskRecords(query, request);
     }
 }

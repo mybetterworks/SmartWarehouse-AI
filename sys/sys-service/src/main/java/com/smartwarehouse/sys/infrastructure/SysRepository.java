@@ -39,7 +39,9 @@ public interface SysRepository {
 
     void updateUserWarehouses(Long userId, List<Long> warehouseIds);
 
-    PageResult<RoleView> pageRoles(PageQuery query);
+    PageResult<RoleView> pageRoles(PageQuery query, RoleQueryRequest request);
+
+    List<RoleView> listRoles();
 
     RoleView saveRole(Long id, RoleSaveRequest request);
 
@@ -49,6 +51,8 @@ public interface SysRepository {
 
     List<MenuView> menuTree();
 
+    PageResult<MenuView> pageMenus(PageQuery query, MenuQueryRequest request);
+
     List<MenuView> menuTreeForUser(Long userId);
 
     MenuView saveMenu(Long id, MenuSaveRequest request);
@@ -57,29 +61,33 @@ public interface SysRepository {
 
     List<DeptView> deptTree();
 
+    PageResult<DeptView> pageDepts(PageQuery query, DeptQueryRequest request);
+
     DeptView saveDept(Long id, DeptSaveRequest request);
 
     void deleteDept(Long id);
 
-    PageResult<PostView> pagePosts(PageQuery query);
+    PageResult<PostView> pagePosts(PageQuery query, PostQueryRequest request);
+
+    List<PostView> listPosts();
 
     PostView savePost(Long id, PostSaveRequest request);
 
     void deletePost(Long id);
 
-    PageResult<DictTypeView> pageDictTypes(PageQuery query);
+    PageResult<DictTypeView> pageDictTypes(PageQuery query, DictTypeQueryRequest request);
 
     DictTypeView saveDictType(Long id, DictTypeSaveRequest request);
 
     void deleteDictType(Long id);
 
-    List<DictItemView> listDictItems(String dictCode);
+    PageResult<DictItemView> pageDictItems(PageQuery query, DictItemQueryRequest request);
 
     DictItemView saveDictItem(Long id, DictItemSaveRequest request);
 
     void deleteDictItem(Long id);
 
-    PageResult<FrontendModuleView> pageFrontendModules(PageQuery query);
+    PageResult<FrontendModuleView> pageFrontendModules(PageQuery query, FrontendModuleQueryRequest request);
 
     List<FrontendModuleView> listEnabledFrontendModules();
 
@@ -93,11 +101,11 @@ public interface SysRepository {
 
     void appendPortalAccessLog(Long userId, String moduleCode, String routePath);
 
-    List<LoginLogView> loginLogs();
+    PageResult<LoginLogView> pageLoginLogs(PageQuery query, LoginLogQueryRequest request);
 
-    List<OperLogView> operLogs();
+    PageResult<OperLogView> pageOperLogs(PageQuery query, OperLogQueryRequest request);
 
-    List<RiskRecordView> riskRecords();
+    PageResult<RiskRecordView> pageRiskRecords(PageQuery query, RiskRecordQueryRequest request);
 
     void appendLoginLog(String username, Long userId, String ip, String userAgent, String status,
                         String failReason, String traceId);

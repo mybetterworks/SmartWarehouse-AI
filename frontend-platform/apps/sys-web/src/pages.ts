@@ -5,6 +5,7 @@ export const validSysRoutes = [
   '/sys/depts',
   '/sys/posts',
   '/sys/dicts',
+  '/sys/dicts/items',
   '/sys/modules',
   '/sys/login-logs',
   '/sys/oper-logs',

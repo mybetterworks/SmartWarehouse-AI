@@ -4,6 +4,7 @@ import com.smartwarehouse.platform.core.PageQuery;
 import com.smartwarehouse.platform.core.PageResult;
 import com.smartwarehouse.platform.core.R;
 import com.smartwarehouse.platform.log.OperationLog;
+import com.smartwarehouse.sys.api.SysDtos.FrontendModuleQueryRequest;
 import com.smartwarehouse.sys.api.SysDtos.FrontendModuleSaveRequest;
 import com.smartwarehouse.sys.api.SysDtos.FrontendModuleView;
 import com.smartwarehouse.sys.application.SysManagementService;
@@ -35,8 +36,15 @@ public class SysFrontendModuleController {
 
     @GetMapping
     public R<PageResult<FrontendModuleView>> frontendModules(@RequestParam(required = false) Integer pageNo,
-                                                             @RequestParam(required = false) Integer pageSize) {
-        return R.ok(service.frontendModules(PageQuery.of(pageNo, pageSize)));
+                                                             @RequestParam(required = false) Integer pageSize,
+                                                             @RequestParam(required = false) String moduleCode,
+                                                             @RequestParam(required = false) String moduleName,
+                                                             @RequestParam(required = false) String ownerName,
+                                                             @RequestParam(required = false) String status) {
+        return R.ok(service.frontendModules(
+                PageQuery.of(pageNo, pageSize),
+                new FrontendModuleQueryRequest(moduleCode, moduleName, ownerName, status)
+        ));
     }
 
     @GetMapping("/enabled")

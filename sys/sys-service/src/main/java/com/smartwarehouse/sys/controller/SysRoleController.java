@@ -5,6 +5,7 @@ import com.smartwarehouse.platform.core.PageResult;
 import com.smartwarehouse.platform.core.R;
 import com.smartwarehouse.platform.log.OperationLog;
 import com.smartwarehouse.sys.api.SysDtos.IdsRequest;
+import com.smartwarehouse.sys.api.SysDtos.RoleQueryRequest;
 import com.smartwarehouse.sys.api.SysDtos.RoleSaveRequest;
 import com.smartwarehouse.sys.api.SysDtos.RoleView;
 import com.smartwarehouse.sys.application.SysManagementService;
@@ -17,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 角色管理接口。
@@ -33,8 +36,16 @@ public class SysRoleController {
 
     @GetMapping
     public R<PageResult<RoleView>> roles(@RequestParam(required = false) Integer pageNo,
-                                         @RequestParam(required = false) Integer pageSize) {
-        return R.ok(service.roles(PageQuery.of(pageNo, pageSize)));
+                                         @RequestParam(required = false) Integer pageSize,
+                                         @RequestParam(required = false) String roleCode,
+                                         @RequestParam(required = false) String roleName,
+                                         @RequestParam(required = false) String status) {
+        return R.ok(service.roles(PageQuery.of(pageNo, pageSize), new RoleQueryRequest(roleCode, roleName, status)));
+    }
+
+    @GetMapping("/all")
+    public R<List<RoleView>> allRoles() {
+        return R.ok(service.allRoles());
     }
 
     @PostMapping

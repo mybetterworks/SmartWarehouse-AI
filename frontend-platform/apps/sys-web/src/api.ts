@@ -45,6 +45,14 @@ export interface UserListQuery extends Record<string, string | number | boolean 
   status?: string
 }
 
+export interface RoleListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  roleCode?: string
+  roleName?: string
+  status?: string
+}
+
 export interface RoleView extends Record<string, unknown> {
   id: number
   roleCode: string
@@ -70,6 +78,83 @@ export interface TreeNodeView extends Record<string, unknown> {
   moduleCode?: string
   status?: string
   children?: TreeNodeView[]
+}
+
+export interface MenuListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  menuName?: string
+  menuType?: string
+  moduleCode?: string
+  status?: string
+  visible?: boolean
+}
+
+export interface DeptListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  deptCode?: string
+  deptName?: string
+  status?: string
+}
+
+export interface PostListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  postCode?: string
+  postName?: string
+  status?: string
+}
+
+export interface DictTypeListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  dictCode?: string
+  dictName?: string
+  status?: string
+}
+
+export interface DictItemListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  dictCode?: string
+  itemLabel?: string
+  itemValue?: string
+  status?: string
+}
+
+export interface ModuleListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  moduleCode?: string
+  moduleName?: string
+  ownerName?: string
+  status?: string
+}
+
+export interface LoginLogListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  username?: string
+  loginStatus?: string
+  loginIp?: string
+}
+
+export interface OperLogListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  username?: string
+  module?: string
+  operation?: string
+  resultStatus?: string
+}
+
+export interface RiskRecordListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  riskType?: string
+  riskTarget?: string
+  action?: string
 }
 
 export interface SimpleRecord extends Record<string, unknown> {
@@ -249,43 +334,48 @@ export const sysApi = {
     request<void>({ url: `/sys/users/${id}/roles`, method: 'PUT', body: { ids } }),
   updateUserWarehouses: (id: number, ids: number[]) =>
     request<void>({ url: `/sys/users/${id}/warehouses`, method: 'PUT', body: { ids } }),
-  roles: () => request<PageResult<RoleView>>({ url: '/sys/roles' }),
+  roles: (params?: RoleListQuery) => request<PageResult<RoleView>>({ url: '/sys/roles', params }),
+  allRoles: () => request<RoleView[]>({ url: '/sys/roles/all' }),
   saveRole: (id: number | undefined, body: RoleForm) =>
     request<RoleView>({ url: id ? `/sys/roles/${id}` : '/sys/roles', method: id ? 'PUT' : 'POST', body }),
   deleteRole: (id: number) => request<void>({ url: `/sys/roles/${id}`, method: 'DELETE' }),
   updateRoleMenus: (id: number, ids: number[]) =>
     request<void>({ url: `/sys/roles/${id}/menus`, method: 'PUT', body: { ids } }),
-  menus: () => request<TreeNodeView[]>({ url: '/sys/menus/tree' }),
+  menus: (params?: MenuListQuery) => request<PageResult<TreeNodeView>>({ url: '/sys/menus', params }),
+  menuTree: () => request<TreeNodeView[]>({ url: '/sys/menus/tree' }),
+  allMenuTree: () => request<TreeNodeView[]>({ url: '/sys/menus/all-tree' }),
   saveMenu: (id: number | undefined, body: MenuForm) =>
     request<TreeNodeView>({ url: id ? `/sys/menus/${id}` : '/sys/menus', method: id ? 'PUT' : 'POST', body }),
   deleteMenu: (id: number) => request<void>({ url: `/sys/menus/${id}`, method: 'DELETE' }),
-  depts: () => request<TreeNodeView[]>({ url: '/sys/depts/tree' }),
+  depts: (params?: DeptListQuery) => request<PageResult<TreeNodeView>>({ url: '/sys/depts', params }),
+  deptTree: () => request<TreeNodeView[]>({ url: '/sys/depts/tree' }),
   saveDept: (id: number | undefined, body: DeptForm) =>
     request<TreeNodeView>({ url: id ? `/sys/depts/${id}` : '/sys/depts', method: id ? 'PUT' : 'POST', body }),
   deleteDept: (id: number) => request<void>({ url: `/sys/depts/${id}`, method: 'DELETE' }),
-  posts: () => request<PageResult<SimpleRecord>>({ url: '/sys/posts' }),
+  posts: (params?: PostListQuery) => request<PageResult<SimpleRecord>>({ url: '/sys/posts', params }),
+  allPosts: () => request<SimpleRecord[]>({ url: '/sys/posts/all' }),
   savePost: (id: number | undefined, body: PostForm) =>
     request<SimpleRecord>({ url: id ? `/sys/posts/${id}` : '/sys/posts', method: id ? 'PUT' : 'POST', body }),
   deletePost: (id: number) => request<void>({ url: `/sys/posts/${id}`, method: 'DELETE' }),
-  dictTypes: () => request<PageResult<SimpleRecord>>({ url: '/sys/dict-types' }),
+  dictTypes: (params?: DictTypeListQuery) => request<PageResult<SimpleRecord>>({ url: '/sys/dict-types', params }),
   saveDictType: (id: number | undefined, body: DictTypeForm) =>
     request<SimpleRecord>({ url: id ? `/sys/dict-types/${id}` : '/sys/dict-types', method: id ? 'PUT' : 'POST', body }),
   deleteDictType: (id: number) => request<void>({ url: `/sys/dict-types/${id}`, method: 'DELETE' }),
-  dictItems: (dictCode: string) => request<SimpleRecord[]>({ url: '/sys/dict-items', params: { dictCode } }),
+  dictItems: (params?: DictItemListQuery) => request<PageResult<SimpleRecord>>({ url: '/sys/dict-items', params }),
   saveDictItem: (id: number | undefined, body: DictItemForm) =>
     request<SimpleRecord>({ url: id ? `/sys/dict-items/${id}` : '/sys/dict-items', method: id ? 'PUT' : 'POST', body }),
   deleteDictItem: (id: number) => request<void>({ url: `/sys/dict-items/${id}`, method: 'DELETE' }),
-  modules: () => request<PageResult<SimpleRecord>>({ url: '/sys/frontend-modules' }),
+  modules: (params?: ModuleListQuery) => request<PageResult<SimpleRecord>>({ url: '/sys/frontend-modules', params }),
   saveModule: (id: number | undefined, body: ModuleForm) =>
     request<SimpleRecord>({ url: id ? `/sys/frontend-modules/${id}` : '/sys/frontend-modules', method: id ? 'PUT' : 'POST', body }),
   deleteModule: (id: number) => request<void>({ url: `/sys/frontend-modules/${id}`, method: 'DELETE' }),
-  loginLogs: () => request<SimpleRecord[]>({ url: '/sys/login-logs' }),
-  operLogs: () => request<SimpleRecord[]>({ url: '/sys/oper-logs' }),
-  riskRecords: () => request<SimpleRecord[]>({ url: '/sys/risk-records' })
+  loginLogs: (params?: LoginLogListQuery) => request<PageResult<SimpleRecord>>({ url: '/sys/login-logs', params }),
+  operLogs: (params?: OperLogListQuery) => request<PageResult<SimpleRecord>>({ url: '/sys/oper-logs', params }),
+  riskRecords: (params?: RiskRecordListQuery) => request<PageResult<SimpleRecord>>({ url: '/sys/risk-records', params })
 }
 
 export async function loadSysPageState(activeDictCode?: string): Promise<SysPageState> {
-  const [userPage, rolePage, menuTree, deptTree, postPage, dictPage, modulePage, loginLogList, operLogList, riskList] =
+  const [userPage, rolePage, menuPage, deptPage, postPage, dictPage, modulePage, loginLogPage, operLogPage, riskPage] =
     await Promise.all([
       sysApi.users(),
       sysApi.roles(),
@@ -307,14 +397,14 @@ export async function loadSysPageState(activeDictCode?: string): Promise<SysPage
   return {
     users: userPage.records,
     roles: rolePage.records,
-    menus: menuTree,
-    depts: deptTree,
+    menus: menuPage.records,
+    depts: deptPage.records,
     posts: postPage.records,
     dictTypes: dictPage.records,
-    dictItems: currentDictCode ? await sysApi.dictItems(currentDictCode) : [],
+    dictItems: currentDictCode ? (await sysApi.dictItems({ dictCode: currentDictCode })).records : [],
     modules: modulePage.records,
-    loginLogs: loginLogList,
-    operLogs: operLogList,
-    riskRecords: riskList
+    loginLogs: loginLogPage.records,
+    operLogs: operLogPage.records,
+    riskRecords: riskPage.records
   }
 }

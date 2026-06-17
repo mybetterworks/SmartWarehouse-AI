@@ -74,6 +74,19 @@
   overflow: hidden;
 }
 
+.sw-table__actions {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sw-table__actions .el-button + .el-button {
+  margin-left: 0;
+}
+
 .sw-table .el-table__inner-wrapper::before,
 .sw-material-editor .el-table__inner-wrapper::before {
   display: none;

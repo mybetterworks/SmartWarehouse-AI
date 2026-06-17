@@ -25,7 +25,7 @@
     :menus="activeNavMenus"
     :breadcrumbs="breadcrumbs"
     :user="user"
-    :active-path="currentPath"
+    :active-path="layoutActivePath"
     :show-aside="!isPortalRoute"
     :show-workbench-button="false"
     show-workbench-drawer-button
@@ -165,6 +165,7 @@ const lastTrackedModuleCode = ref('')
 const tabsReady = ref(false)
 
 const currentPath = computed(() => extractPortalPath(currentFullPath.value))
+const layoutActivePath = computed(() => (currentPath.value === '/sys/dicts/items' ? '/sys/dicts' : currentPath.value))
 const storageKey = computed(() => (user.value ? `sw.portal.tabs:${user.value.userId}` : ''))
 const isPortalRoute = computed(() => currentPath.value === WORKBENCH_TAB_ID)
 const activeTab = computed(() => tabs.value.find((tab) => tab.id === activeTabId.value) ?? tabs.value[0])

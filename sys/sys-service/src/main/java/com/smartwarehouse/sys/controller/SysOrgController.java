@@ -4,8 +4,10 @@ import com.smartwarehouse.platform.core.PageQuery;
 import com.smartwarehouse.platform.core.PageResult;
 import com.smartwarehouse.platform.core.R;
 import com.smartwarehouse.platform.log.OperationLog;
+import com.smartwarehouse.sys.api.SysDtos.DeptQueryRequest;
 import com.smartwarehouse.sys.api.SysDtos.DeptSaveRequest;
 import com.smartwarehouse.sys.api.SysDtos.DeptView;
+import com.smartwarehouse.sys.api.SysDtos.PostQueryRequest;
 import com.smartwarehouse.sys.api.SysDtos.PostSaveRequest;
 import com.smartwarehouse.sys.api.SysDtos.PostView;
 import com.smartwarehouse.sys.application.SysManagementService;
@@ -34,6 +36,15 @@ public class SysOrgController {
         this.service = service;
     }
 
+    @GetMapping("/depts")
+    public R<PageResult<DeptView>> pageDepts(@RequestParam(required = false) Integer pageNo,
+                                             @RequestParam(required = false) Integer pageSize,
+                                             @RequestParam(required = false) String deptCode,
+                                             @RequestParam(required = false) String deptName,
+                                             @RequestParam(required = false) String status) {
+        return R.ok(service.depts(PageQuery.of(pageNo, pageSize), new DeptQueryRequest(deptCode, deptName, status)));
+    }
+
     @GetMapping("/depts/tree")
     public R<List<DeptView>> depts() {
         return R.ok(service.deptTree());
@@ -60,8 +71,16 @@ public class SysOrgController {
 
     @GetMapping("/posts")
     public R<PageResult<PostView>> posts(@RequestParam(required = false) Integer pageNo,
-                                         @RequestParam(required = false) Integer pageSize) {
-        return R.ok(service.posts(PageQuery.of(pageNo, pageSize)));
+                                         @RequestParam(required = false) Integer pageSize,
+                                         @RequestParam(required = false) String postCode,
+                                         @RequestParam(required = false) String postName,
+                                         @RequestParam(required = false) String status) {
+        return R.ok(service.posts(PageQuery.of(pageNo, pageSize), new PostQueryRequest(postCode, postName, status)));
+    }
+
+    @GetMapping("/posts/all")
+    public R<List<PostView>> allPosts() {
+        return R.ok(service.allPosts());
     }
 
     @PostMapping("/posts")

@@ -29,6 +29,37 @@ public final class SysDtos {
     public record UserQueryRequest(String username, String nickname, String phone, String status) {
     }
 
+    public record RoleQueryRequest(String roleCode, String roleName, String status) {
+    }
+
+    public record MenuQueryRequest(String menuName, String menuType, String moduleCode, String status,
+                                   Boolean visible) {
+    }
+
+    public record DeptQueryRequest(String deptCode, String deptName, String status) {
+    }
+
+    public record PostQueryRequest(String postCode, String postName, String status) {
+    }
+
+    public record DictTypeQueryRequest(String dictCode, String dictName, String status) {
+    }
+
+    public record DictItemQueryRequest(String dictCode, String itemLabel, String itemValue, String status) {
+    }
+
+    public record FrontendModuleQueryRequest(String moduleCode, String moduleName, String ownerName, String status) {
+    }
+
+    public record LoginLogQueryRequest(String username, String loginStatus, String loginIp) {
+    }
+
+    public record OperLogQueryRequest(String username, String module, String operation, String resultStatus) {
+    }
+
+    public record RiskRecordQueryRequest(String riskType, String riskTarget, String action) {
+    }
+
     public record StatusUpdateRequest(String status) {
     }
 

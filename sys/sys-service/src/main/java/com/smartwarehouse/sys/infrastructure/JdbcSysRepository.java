@@ -206,16 +206,36 @@ public class JdbcSysRepository implements SysRepository {
     }
 
     @Override
-    public PageResult<RoleView> pageRoles(PageQuery query) {
-        long total = count("select count(*) from sys_role where deleted = 0");
+    public PageResult<RoleView> pageRoles(PageQuery query, RoleQueryRequest request) {
+        StringBuilder whereSql = new StringBuilder(" where deleted = 0");
+        List<Object> args = new ArrayList<>();
+        appendLikeFilter(whereSql, args, "role_code", request == null ? null : request.roleCode());
+        appendLikeFilter(whereSql, args, "role_name", request == null ? null : request.roleName());
+        appendStatusFilter(whereSql, args, request == null ? null : request.status());
+
+        long total = count("select count(*) from sys_role" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
         List<RoleView> records = jdbc.query("""
+                select id, role_code, role_name, data_scope, status, remark
+                from sys_role
+                """ + "\n" + whereSql + "\n" + """
+                order by id
+                limit ? offset ?
+                """, roleMapper(), pageArgs.toArray());
+        return new PageResult<>(records, total, query.pageNo(), query.pageSize());
+    }
+
+    @Override
+    public List<RoleView> listRoles() {
+        return jdbc.query("""
                 select id, role_code, role_name, data_scope, status, remark
                 from sys_role
                 where deleted = 0
                 order by id
-                limit ? offset ?
-                """, roleMapper(), query.pageSize(), offset(query));
-        return new PageResult<>(records, total, query.pageNo(), query.pageSize());
+                """, roleMapper());
     }
 
     @Override
@@ -268,10 +288,35 @@ public class JdbcSysRepository implements SysRepository {
         List<MenuRecord> menus = jdbc.query("""
                 select id, parent_id, menu_name, menu_type, module_code, path, component, permission, icon, sort_no, visible, status
                 from sys_menu
-                where deleted = 0 and status = 'ENABLED'
+                where deleted = 0
                 order by sort_no, id
                 """, menuRecordMapper());
         return buildMenuTree(menus, 0L);
+    }
+
+    @Override
+    public PageResult<MenuView> pageMenus(PageQuery query, MenuQueryRequest request) {
+        StringBuilder whereSql = new StringBuilder(" where deleted = 0");
+        List<Object> args = new ArrayList<>();
+        appendLikeFilter(whereSql, args, "menu_name", request == null ? null : request.menuName());
+        appendEqualFilter(whereSql, args, "menu_type", request == null ? null : request.menuType());
+        appendEqualFilter(whereSql, args, "module_code", request == null ? null : request.moduleCode());
+        appendStatusFilter(whereSql, args, request == null ? null : request.status());
+        appendVisibleFilter(whereSql, args, request == null ? null : request.visible());
+
+        long total = count("select count(*) from sys_menu" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
+        List<MenuView> records = jdbc.query("""
+                select id, parent_id, menu_name, menu_type, module_code, path, component, permission, icon, sort_no, visible, status
+                from sys_menu
+                """ + "\n" + whereSql + "\n" + """
+                order by sort_no, id
+                limit ? offset ?
+                """, menuRecordMapper(), pageArgs.toArray()).stream().map(menu -> toMenuView(menu, List.of())).toList();
+        return new PageResult<>(records, total, query.pageNo(), query.pageSize());
     }
 
     @Override
@@ -341,6 +386,29 @@ public class JdbcSysRepository implements SysRepository {
     }
 
     @Override
+    public PageResult<DeptView> pageDepts(PageQuery query, DeptQueryRequest request) {
+        StringBuilder whereSql = new StringBuilder(" where deleted = 0");
+        List<Object> args = new ArrayList<>();
+        appendLikeFilter(whereSql, args, "dept_code", request == null ? null : request.deptCode());
+        appendLikeFilter(whereSql, args, "dept_name", request == null ? null : request.deptName());
+        appendStatusFilter(whereSql, args, request == null ? null : request.status());
+
+        long total = count("select count(*) from sys_dept" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
+        List<DeptView> records = jdbc.query("""
+                select id, parent_id, dept_code, dept_name, sort_no, status
+                from sys_dept
+                """ + "\n" + whereSql + "\n" + """
+                order by sort_no, id
+                limit ? offset ?
+                """, deptRecordMapper(), pageArgs.toArray()).stream().map(dept -> toDeptView(dept, List.of())).toList();
+        return new PageResult<>(records, total, query.pageNo(), query.pageSize());
+    }
+
+    @Override
     public DeptView saveDept(Long id, DeptSaveRequest request) {
         Long actualId = id == null ? idGenerator.nextId() : id;
         LocalDateTime now = LocalDateTime.now();
@@ -372,15 +440,35 @@ public class JdbcSysRepository implements SysRepository {
     }
 
     @Override
-    public PageResult<PostView> pagePosts(PageQuery query) {
-        long total = count("select count(*) from sys_post");
+    public PageResult<PostView> pagePosts(PageQuery query, PostQueryRequest request) {
+        StringBuilder whereSql = new StringBuilder(" where 1 = 1");
+        List<Object> args = new ArrayList<>();
+        appendLikeFilter(whereSql, args, "post_code", request == null ? null : request.postCode());
+        appendLikeFilter(whereSql, args, "post_name", request == null ? null : request.postName());
+        appendStatusFilter(whereSql, args, request == null ? null : request.status());
+
+        long total = count("select count(*) from sys_post" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
         List<PostView> records = jdbc.query("""
                 select id, post_code, post_name, sort_no, status
                 from sys_post
+                """ + "\n" + whereSql + "\n" + """
                 order by sort_no, id
                 limit ? offset ?
-                """, postMapper(), query.pageSize(), offset(query));
+                """, postMapper(), pageArgs.toArray());
         return new PageResult<>(records, total, query.pageNo(), query.pageSize());
+    }
+
+    @Override
+    public List<PostView> listPosts() {
+        return jdbc.query("""
+                select id, post_code, post_name, sort_no, status
+                from sys_post
+                order by sort_no, id
+                """, postMapper());
     }
 
     @Override
@@ -411,14 +499,25 @@ public class JdbcSysRepository implements SysRepository {
     }
 
     @Override
-    public PageResult<DictTypeView> pageDictTypes(PageQuery query) {
-        long total = count("select count(*) from sys_dict_type");
+    public PageResult<DictTypeView> pageDictTypes(PageQuery query, DictTypeQueryRequest request) {
+        StringBuilder whereSql = new StringBuilder(" where 1 = 1");
+        List<Object> args = new ArrayList<>();
+        appendLikeFilter(whereSql, args, "dict_code", request == null ? null : request.dictCode());
+        appendLikeFilter(whereSql, args, "dict_name", request == null ? null : request.dictName());
+        appendStatusFilter(whereSql, args, request == null ? null : request.status());
+
+        long total = count("select count(*) from sys_dict_type" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
         List<DictTypeView> records = jdbc.query("""
                 select id, dict_code, dict_name, status
                 from sys_dict_type
+                """ + "\n" + whereSql + "\n" + """
                 order by id
                 limit ? offset ?
-                """, dictTypeMapper(), query.pageSize(), offset(query));
+                """, dictTypeMapper(), pageArgs.toArray());
         return new PageResult<>(records, total, query.pageNo(), query.pageSize());
     }
 
@@ -451,13 +550,32 @@ public class JdbcSysRepository implements SysRepository {
     }
 
     @Override
-    public List<DictItemView> listDictItems(String dictCode) {
-        return jdbc.query("""
+    public PageResult<DictItemView> pageDictItems(PageQuery query, DictItemQueryRequest request) {
+        String dictCode = request == null ? null : request.dictCode();
+        if (dictCode == null || dictCode.isBlank()) {
+            return new PageResult<>(List.of(), 0, query.pageNo(), query.pageSize());
+        }
+
+        StringBuilder whereSql = new StringBuilder(" where lower(dict_code) = ?");
+        List<Object> args = new ArrayList<>();
+        args.add(dictCode.trim().toLowerCase());
+        appendLikeFilter(whereSql, args, "item_label", request.itemLabel());
+        appendLikeFilter(whereSql, args, "item_value", request.itemValue());
+        appendStatusFilter(whereSql, args, request.status());
+
+        long total = count("select count(*) from sys_dict_item" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
+        List<DictItemView> records = jdbc.query("""
                 select id, dict_code, item_label, item_value, sort_no, status
                 from sys_dict_item
-                where dict_code = ?
+                """ + "\n" + whereSql + "\n" + """
                 order by sort_no, id
-                """, dictItemMapper(), dictCode);
+                limit ? offset ?
+                """, dictItemMapper(), pageArgs.toArray());
+        return new PageResult<>(records, total, query.pageNo(), query.pageSize());
     }
 
     @Override
@@ -490,15 +608,27 @@ public class JdbcSysRepository implements SysRepository {
     }
 
     @Override
-    public PageResult<FrontendModuleView> pageFrontendModules(PageQuery query) {
-        long total = count("select count(*) from sys_frontend_module");
+    public PageResult<FrontendModuleView> pageFrontendModules(PageQuery query, FrontendModuleQueryRequest request) {
+        StringBuilder whereSql = new StringBuilder(" where 1 = 1");
+        List<Object> args = new ArrayList<>();
+        appendLikeFilter(whereSql, args, "module_code", request == null ? null : request.moduleCode());
+        appendLikeFilter(whereSql, args, "module_name", request == null ? null : request.moduleName());
+        appendLikeFilter(whereSql, args, "owner_name", request == null ? null : request.ownerName());
+        appendStatusFilter(whereSql, args, request == null ? null : request.status());
+
+        long total = count("select count(*) from sys_frontend_module" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
         List<FrontendModuleView> records = jdbc.query("""
                 select id, module_code, module_name, route_prefix, entry_url, remote_name, remote_entry, exposed_module,
                        api_prefix, owner_type, owner_name, status, sort_no
                 from sys_frontend_module
+                """ + "\n" + whereSql + "\n" + """
                 order by sort_no, id
                 limit ? offset ?
-                """, frontendModuleMapper(), query.pageSize(), offset(query));
+                """, frontendModuleMapper(), pageArgs.toArray());
         return new PageResult<>(records, total, query.pageNo(), query.pageSize());
     }
 
@@ -692,34 +822,74 @@ public class JdbcSysRepository implements SysRepository {
     }
 
     @Override
-    public List<LoginLogView> loginLogs() {
-        return jdbc.query("""
+    public PageResult<LoginLogView> pageLoginLogs(PageQuery query, LoginLogQueryRequest request) {
+        StringBuilder whereSql = new StringBuilder(" where 1 = 1");
+        List<Object> args = new ArrayList<>();
+        appendLikeFilter(whereSql, args, "username", request == null ? null : request.username());
+        appendEqualFilter(whereSql, args, "login_status", request == null ? null : request.loginStatus());
+        appendLikeFilter(whereSql, args, "login_ip", request == null ? null : request.loginIp());
+
+        long total = count("select count(*) from sys_login_log" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
+        List<LoginLogView> records = jdbc.query("""
                 select id, username, user_id, login_ip, user_agent, login_status, fail_reason, login_time, trace_id
                 from sys_login_log
+                """ + "\n" + whereSql + "\n" + """
                 order by login_time desc
-                limit 200
-                """, loginLogMapper());
+                limit ? offset ?
+                """, loginLogMapper(), pageArgs.toArray());
+        return new PageResult<>(records, total, query.pageNo(), query.pageSize());
     }
 
     @Override
-    public List<OperLogView> operLogs() {
-        return jdbc.query("""
+    public PageResult<OperLogView> pageOperLogs(PageQuery query, OperLogQueryRequest request) {
+        StringBuilder whereSql = new StringBuilder(" where 1 = 1");
+        List<Object> args = new ArrayList<>();
+        appendLikeFilter(whereSql, args, "username", request == null ? null : request.username());
+        appendLikeFilter(whereSql, args, "module", request == null ? null : request.module());
+        appendLikeFilter(whereSql, args, "operation", request == null ? null : request.operation());
+        appendEqualFilter(whereSql, args, "result_status", request == null ? null : request.resultStatus());
+
+        long total = count("select count(*) from sys_oper_log" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
+        List<OperLogView> records = jdbc.query("""
                 select id, user_id, username, module, operation, request_uri, request_method, result_status,
                        error_message, cost_ms, oper_ip, trace_id, created_time
                 from sys_oper_log
+                """ + "\n" + whereSql + "\n" + """
                 order by created_time desc
-                limit 200
-                """, operLogMapper());
+                limit ? offset ?
+                """, operLogMapper(), pageArgs.toArray());
+        return new PageResult<>(records, total, query.pageNo(), query.pageSize());
     }
 
     @Override
-    public List<RiskRecordView> riskRecords() {
-        return jdbc.query("""
+    public PageResult<RiskRecordView> pageRiskRecords(PageQuery query, RiskRecordQueryRequest request) {
+        StringBuilder whereSql = new StringBuilder(" where 1 = 1");
+        List<Object> args = new ArrayList<>();
+        appendLikeFilter(whereSql, args, "risk_type", request == null ? null : request.riskType());
+        appendLikeFilter(whereSql, args, "risk_target", request == null ? null : request.riskTarget());
+        appendLikeFilter(whereSql, args, "action", request == null ? null : request.action());
+
+        long total = count("select count(*) from sys_risk_record" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
+        List<RiskRecordView> records = jdbc.query("""
                 select id, risk_type, risk_target, risk_level, action, reason, expire_time, extra_json, created_time
                 from sys_risk_record
+                """ + "\n" + whereSql + "\n" + """
                 order by created_time desc
-                limit 200
-                """, riskRecordMapper());
+                limit ? offset ?
+                """, riskRecordMapper(), pageArgs.toArray());
+        return new PageResult<>(records, total, query.pageNo(), query.pageSize());
     }
 
     @Override
@@ -887,6 +1057,34 @@ public class JdbcSysRepository implements SysRepository {
         }
         whereSql.append(" and status = ?");
         args.add(status.trim().toUpperCase());
+    }
+
+    private void appendStatusFilter(StringBuilder whereSql, List<Object> args, String status) {
+        appendUserStatusFilter(whereSql, args, status);
+    }
+
+    private void appendLikeFilter(StringBuilder whereSql, List<Object> args, String column, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        whereSql.append(" and lower(").append(column).append(") like ?");
+        args.add("%" + value.trim().toLowerCase() + "%");
+    }
+
+    private void appendEqualFilter(StringBuilder whereSql, List<Object> args, String column, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        whereSql.append(" and lower(").append(column).append(") = ?");
+        args.add(value.trim().toLowerCase());
+    }
+
+    private void appendVisibleFilter(StringBuilder whereSql, List<Object> args, Boolean visible) {
+        if (visible == null) {
+            return;
+        }
+        whereSql.append(" and visible = ?");
+        args.add(visible ? 1 : 0);
     }
 
     private long count(String sql, Object... args) {

@@ -26,6 +26,9 @@ public final class SysDtos {
                                   Long deptId, Long postId, String status) {
     }
 
+    public record UserQueryRequest(String username, String nickname, String phone, String status) {
+    }
+
     public record StatusUpdateRequest(String status) {
     }
 

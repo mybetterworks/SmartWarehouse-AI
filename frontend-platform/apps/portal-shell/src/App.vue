@@ -137,6 +137,7 @@ import PortalTabPane, { type PortalTabRouteChangePayload } from './PortalTabPane
 import { createWorkbenchTab, loadPortalTabSnapshot, savePortalTabSnapshot, type PortalTabRecord, WORKBENCH_TAB_ID } from './portalTabs'
 import { extractPortalPath, getBrowserFullPath, isRouteInModule, normalizePortalFullPath, normalizePortalPath, resolveModuleRoute } from './routeUtils'
 import { resolveFallbackTabIcon, resolvePortalIcon } from './tabIcons'
+import { resolveMenuBreadcrumbTrail } from '../../shared/menuBreadcrumbs'
 
 type HistoryMode = 'push' | 'replace' | 'none'
 
@@ -177,14 +178,41 @@ const activeNavMenus = computed<NavMenuItem[]>(() => {
   const moduleMenus = navMenus.value.filter((menu) => menu.moduleCode === activeModule.value?.moduleCode)
   return unwrapModuleRootMenus(moduleMenus, activeModule.value.routePrefix || `/${activeModule.value.moduleCode}`)
 })
+const currentMenuTitle = computed(() => findBestMenuMatch(currentPath.value)?.title ?? '')
 const breadcrumbs = computed<BreadcrumbItem[]>(() => {
+  const workbenchBreadcrumb = { title: '工作台', path: '/portal' }
+  if (isPortalRoute.value) {
+    return [workbenchBreadcrumb]
+  }
+
+  const trail = resolveMenuBreadcrumbTrail(menus.value, currentPath.value)
+  const activeModuleTitle = activeModule.value?.moduleName
+  const normalizedTrail =
+    activeModuleTitle && trail[0]?.title !== activeModuleTitle ? [{ title: activeModuleTitle }, ...trail] : trail
+
+  if (normalizedTrail.length) {
+    return [workbenchBreadcrumb, ...normalizedTrail]
+  }
+
+  if (activeModuleTitle) {
+    return [workbenchBreadcrumb, { title: activeModuleTitle }]
+  }
+
+  return [workbenchBreadcrumb]
   if (isPortalRoute.value) {
     return [{ title: '工作台', path: '/portal' }]
+  }
+  if (currentPath.value === '/sys/users') {
+    return [
+      { title: '工作台', path: '/portal' },
+      { title: '系统管理' },
+      { title: currentMenuTitle.value || '用户管理' }
+    ]
   }
   if (activeModule.value) {
     return [
       { title: '工作台', path: '/portal' },
-      { title: activeModule.value.moduleName, path: currentPath.value }
+      { title: activeModule.value?.moduleName || '', path: currentPath.value }
     ]
   }
   return [{ title: '工作台', path: '/portal' }]

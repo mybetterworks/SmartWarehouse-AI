@@ -6,6 +6,7 @@ import com.smartwarehouse.platform.core.R;
 import com.smartwarehouse.platform.log.OperationLog;
 import com.smartwarehouse.sys.api.SysDtos.IdsRequest;
 import com.smartwarehouse.sys.api.SysDtos.StatusUpdateRequest;
+import com.smartwarehouse.sys.api.SysDtos.UserQueryRequest;
 import com.smartwarehouse.sys.api.SysDtos.UserSaveRequest;
 import com.smartwarehouse.sys.api.SysDtos.UserView;
 import com.smartwarehouse.sys.application.SysManagementService;
@@ -36,8 +37,12 @@ public class SysUserController {
 
     @GetMapping
     public R<PageResult<UserView>> users(@RequestParam(required = false) Integer pageNo,
-                                         @RequestParam(required = false) Integer pageSize) {
-        return R.ok(service.users(PageQuery.of(pageNo, pageSize)));
+                                         @RequestParam(required = false) Integer pageSize,
+                                         @RequestParam(required = false) String username,
+                                         @RequestParam(required = false) String nickname,
+                                         @RequestParam(required = false) String phone,
+                                         @RequestParam(required = false) String status) {
+        return R.ok(service.users(PageQuery.of(pageNo, pageSize), new UserQueryRequest(username, nickname, phone, status)));
     }
 
     @PostMapping

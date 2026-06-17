@@ -1,14 +1,23 @@
 <template>
-  <PlatformPage :title="pageMeta.title" :description="pageMeta.description">
-    <template v-if="showToolbar" #toolbar>
+  <PlatformPage :title="resolvedTitle" :description="resolvedDescription" :class="{ 'sys-content-page--plain': isUserRoute }">
+    <template v-if="showPageToolbar" #toolbar>
       <el-button type="primary" :loading="loading" @click="emit('refresh')">刷新数据</el-button>
     </template>
 
     <UserManagementView
       v-if="activeRoute === '/sys/users'"
       :columns="userColumns"
+      :loading="loading"
+      :query="userQuery"
+      :pagination="userPagination"
+      :selected-count="userSelectionCount"
       :users="state.users"
+      @search="emit('searchUsers')"
+      @reset="emit('resetUsers')"
       @create="emit('createUser')"
+      @delete-selected="emit('deleteSelectedUsers')"
+      @page-change="emit('userPageChange', $event)"
+      @selection-change="emit('userSelectionChange', $event)"
       @edit="emit('editUser', $event)"
       @warehouse="emit('warehouseUser', $event)"
       @delete="emit('deleteUser', $event)"
@@ -78,9 +87,9 @@
 
 <script setup lang="ts">
 import { PlatformPage } from '@smartwarehouse/platform-ui'
-import type { TableColumn } from '@smartwarehouse/platform-types'
+import type { TableColumn, TablePagination } from '@smartwarehouse/platform-types'
 import { computed } from 'vue'
-import type { RoleView, SimpleRecord, SysPageState, TreeNodeView, UserView } from './api'
+import type { RoleView, SimpleRecord, SysPageState, TreeNodeView, UserListQuery, UserView } from './api'
 import AuditLogView from './views/AuditLogView.vue'
 import DeptManagementView from './views/DeptManagementView.vue'
 import DictManagementView from './views/DictManagementView.vue'
@@ -97,6 +106,9 @@ const props = defineProps<{
   state: SysPageState
   loading?: boolean
   showToolbar?: boolean
+  userQuery: UserListQuery
+  userPagination: TablePagination
+  userSelectionCount: number
   userColumns: TableColumn[]
   roleColumns: TableColumn[]
   menuColumns: TableColumn[]
@@ -114,7 +126,12 @@ const emit = defineEmits<{
   refresh: []
   'update:activeDictCode': [value: string]
   changeDict: []
+  searchUsers: []
+  resetUsers: []
   createUser: []
+  deleteSelectedUsers: []
+  userPageChange: [pagination: TablePagination]
+  userSelectionChange: [rows: UserView[]]
   editUser: [row: UserView]
   warehouseUser: [row: UserView]
   deleteUser: [row: UserView]
@@ -157,4 +174,9 @@ const pageMeta = computed(() => {
   }
   return meta[props.activeRoute] ?? meta['/sys/users']
 })
+
+const isUserRoute = computed(() => props.activeRoute === '/sys/users')
+const showPageToolbar = computed(() => Boolean(props.showToolbar) && !isUserRoute.value)
+const resolvedTitle = computed(() => (isUserRoute.value ? undefined : pageMeta.value.title))
+const resolvedDescription = computed(() => (isUserRoute.value ? undefined : pageMeta.value.description))
 </script>

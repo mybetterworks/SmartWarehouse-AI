@@ -3,7 +3,7 @@
     v-model:collapsed="collapsed"
     title="SmartWarehouse-AI"
     :menus="standaloneMenus"
-    :breadcrumbs="sys.breadcrumbs"
+    :breadcrumbs="breadcrumbs"
     :user="user"
     :active-path="sys.activeRoute"
     :show-workbench-button="false"
@@ -19,6 +19,9 @@
       :state="sys.state"
       :loading="sys.loading"
       :show-toolbar="true"
+      :user-query="sys.userQuery"
+      :user-pagination="sys.userPagination"
+      :user-selection-count="sys.userSelectionCount"
       :user-columns="sys.userColumns"
       :role-columns="sys.roleColumns"
       :menu-columns="sys.menuColumns"
@@ -32,6 +35,11 @@
       :risk-columns="sys.riskColumns"
       @refresh="sys.loadAll"
       @update:active-dict-code="sys.activeDictCode = $event"
+      @search-users="sys.searchUsers"
+      @reset-users="sys.resetUserQuery"
+      @delete-selected-users="sys.deleteSelectedUsers"
+      @user-page-change="sys.handleUserPageChange"
+      @user-selection-change="sys.handleUserSelectionChange"
       @change-dict="sys.reloadDictItems"
       @create-user="sys.openUserDialog()"
       @edit-user="sys.openUserDialog"
@@ -68,6 +76,7 @@
 import { PlatformLayout } from '@smartwarehouse/platform-ui'
 import type { BreadcrumbItem, LoginUser, MenuItem, NavMenuItem } from '@smartwarehouse/platform-types'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { normalizeMenuPath, resolveMenuBreadcrumbTrail, type BreadcrumbMenuNode } from '../../shared/menuBreadcrumbs'
 import SysContentView from './SysContentView.vue'
 import SysManagementDialogs from './SysManagementDialogs.vue'
 import { resolveSysLocationFromLocation, useSysManagement } from './useSysManagement'
@@ -87,6 +96,22 @@ const sys = reactive(sysApi)
 const standaloneMenus = computed<NavMenuItem[]>(() => {
   const resolved = sys.resolveSysMenus(props.menus)
   return resolved.length ? resolved : sys.sysMenus
+})
+const breadcrumbMenus = computed<BreadcrumbMenuNode[]>(() => {
+  const sysModuleMenus = props.menus.filter((item) => item.moduleCode === 'sys')
+  if (sysModuleMenus.length) {
+    return sysModuleMenus.some((item) => normalizeMenuPath(item.path) === '/sys')
+      ? sysModuleMenus
+      : [createSysRootMenu(sysModuleMenus)]
+  }
+  return [createSysRootMenu(sys.sysMenus.map(toBreadcrumbMenuNode))]
+})
+const breadcrumbs = computed<BreadcrumbItem[]>(() => {
+  const trail = resolveMenuBreadcrumbTrail(breadcrumbMenus.value, sys.activeRoute)
+  if (!trail.length) {
+    return [{ title: '系统管理' }]
+  }
+  return trail[0]?.title === '系统管理' ? trail : [{ title: '系统管理' }, ...trail]
 })
 
 onMounted(async () => {
@@ -125,5 +150,21 @@ function writeActiveRouteToLocation(path: string): void {
   const url = new URL(window.location.href)
   url.searchParams.set('redirect', path)
   window.history.replaceState(null, '', url.toString())
+}
+
+function createSysRootMenu(children: BreadcrumbMenuNode[]): BreadcrumbMenuNode {
+  return {
+    title: '系统管理',
+    path: '/sys',
+    children
+  }
+}
+
+function toBreadcrumbMenuNode(menu: NavMenuItem): BreadcrumbMenuNode {
+  return {
+    title: menu.title,
+    path: menu.path,
+    children: menu.children?.map(toBreadcrumbMenuNode)
+  }
 }
 </script>

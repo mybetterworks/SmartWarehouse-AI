@@ -1,6 +1,9 @@
 package com.smartwarehouse.sys;
 
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -30,11 +33,15 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "spring.datasource.driver-class-name=org.h2.Driver",
                 "spring.datasource.username=sa",
                 "spring.datasource.password=",
+                "spring.data.redis.host=127.0.0.1",
+                "spring.data.redis.port=6391",
+                "spring.data.redis.timeout=200ms",
                 "spring.sql.init.mode=always",
                 "spring.sql.init.schema-locations=classpath:schema-h2.sql",
                 "spring.sql.init.data-locations=classpath:data-h2.sql"
         }
 )
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class AuthFlowIntegrationTest {
 
     @LocalServerPort
@@ -44,6 +51,7 @@ class AuthFlowIntegrationTest {
     private TestRestTemplate restTemplate;
 
     @Test
+    @Order(5)
     void loginSuccessAndFailureRiskShouldWork() {
         Map<String, Object> loginBody = Map.of("username", "admin", "password", "TestLocalPassword");
         Map<?, ?> login = restTemplate.postForObject(url("/api/sys/auth/login"), json(loginBody), Map.class);
@@ -85,6 +93,7 @@ class AuthFlowIntegrationTest {
     }
 
     @Test
+    @Order(2)
     void workbenchShouldBeAvailableForAdminAndReflectPortalData() {
         String accessToken = accessToken("admin", "TestLocalPassword");
         HttpHeaders tokenHeaders = tokenHeaders(accessToken);
@@ -108,6 +117,7 @@ class AuthFlowIntegrationTest {
     }
 
     @Test
+    @Order(3)
     void workbenchShouldBeAvailableForWmsManagerButStillBlockSysManagementApis() {
         String accessToken = accessToken("wms_manager", "TestLocalPassword");
         HttpHeaders tokenHeaders = tokenHeaders(accessToken);
@@ -139,6 +149,31 @@ class AuthFlowIntegrationTest {
     }
 
     @Test
+    @Order(1)
+    void usersApiShouldSupportQueryAndPagination() {
+        String accessToken = accessToken("admin", "TestLocalPassword");
+        HttpHeaders tokenHeaders = tokenHeaders(accessToken);
+
+        Map<?, ?> users = restTemplate.exchange(
+                url("/api/sys/users?pageNo=1&pageSize=1&username=admin&status=ENABLED"),
+                HttpMethod.GET,
+                new HttpEntity<>(tokenHeaders),
+                Map.class
+        ).getBody();
+
+        assertThat(users).isNotNull();
+        assertThat(users.get("code")).isEqualTo("SUCCESS");
+        Map<?, ?> data = (Map<?, ?>) users.get("data");
+        assertThat(data.get("pageNo")).isEqualTo(1);
+        assertThat(data.get("pageSize")).isEqualTo(1);
+        assertThat(data.get("total")).isEqualTo(1);
+        java.util.List<?> records = (java.util.List<?>) data.get("records");
+        assertThat(records).hasSize(1);
+        assertThat(((Map<?, ?>) records.get(0)).get("username")).isEqualTo("admin");
+    }
+
+    @Test
+    @Order(4)
     void portalAccessLogShouldAffectRecentAndCommonModules() {
         String accessToken = accessToken("admin", "TestLocalPassword");
         HttpHeaders tokenHeaders = tokenHeaders(accessToken);

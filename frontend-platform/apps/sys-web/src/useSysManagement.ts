@@ -1,10 +1,9 @@
 import { ApiError } from '@smartwarehouse/platform-sdk'
-import type { BreadcrumbItem, LoginUser, MenuItem, NavMenuItem, TableColumn } from '@smartwarehouse/platform-types'
+import type { BreadcrumbItem, LoginUser, MenuItem, NavMenuItem, PageResult, TableColumn, TablePagination } from '@smartwarehouse/platform-types'
 import { ElMessage, ElMessageBox, ElTree } from 'element-plus'
 import { computed, nextTick, reactive, ref } from 'vue'
 import {
   changePassword,
-  loadSysPageState,
   sysApi,
   type DeptForm,
   type DictItemForm,
@@ -17,6 +16,7 @@ import {
   type SimpleRecord,
   type SysPageState,
   type TreeNodeView,
+  type UserListQuery,
   type UserForm,
   type UserView
 } from './api'
@@ -43,6 +43,9 @@ export function useSysManagement() {
   const activeRoute = ref(resolveActiveRoute(resolveSysLocationFromLocation()))
   const activeDictCode = ref('')
   const state = reactive<SysPageState>(createEmptyState())
+  const userQuery = reactive<UserListQuery>({ username: '', nickname: '', phone: '', status: '' })
+  const userPagination = reactive<TablePagination>({ pageNo: 1, pageSize: 10, total: 0 })
+  const selectedUsers = ref<UserView[]>([])
   const profileDialogVisible = ref(false)
   const passwordDialogVisible = ref(false)
   const passwordSubmitting = ref(false)
@@ -197,16 +200,149 @@ export function useSysManagement() {
     }
   ])
 
-  const breadcrumbs = computed<BreadcrumbItem[]>(() => [{ title: '系统管理', path: activeRoute.value }])
+  const userSelectionCount = computed(() => selectedUsers.value.length)
+  const breadcrumbs = computed<BreadcrumbItem[]>(() => {
+    if (activeRoute.value === '/sys/users') {
+      return [{ title: '工作台' }, { title: '系统管理' }, { title: '用户管理' }]
+    }
+    return [{ title: '系统管理', path: activeRoute.value }]
+  })
+
+  function buildUserListQuery(): UserListQuery {
+    const username = userQuery.username?.trim()
+    const nickname = userQuery.nickname?.trim()
+    const phone = userQuery.phone?.trim()
+    const status = userQuery.status?.trim()
+    return {
+      pageNo: userPagination.pageNo,
+      pageSize: userPagination.pageSize,
+      username: username || undefined,
+      nickname: nickname || undefined,
+      phone: phone || undefined,
+      status: status || undefined
+    }
+  }
+
+  function applyUserPage(page: PageResult<UserView>): void {
+    state.users = page.records
+    userPagination.pageNo = page.pageNo
+    userPagination.pageSize = page.pageSize
+    userPagination.total = page.total
+    selectedUsers.value = []
+  }
+
+  function requestUsers(): Promise<PageResult<UserView>> {
+    return sysApi.users(buildUserListQuery())
+  }
 
   async function loadAll(): Promise<void> {
     loading.value = true
     try {
-      const nextState = await loadSysPageState(activeDictCode.value)
-      Object.assign(state, nextState)
-      if (!activeDictCode.value || !state.dictTypes.some((item) => String(item.dictCode) === activeDictCode.value)) {
-        activeDictCode.value = String(state.dictTypes[0]?.dictCode ?? '')
+      const [userPage, rolePage, menuTree, deptTree, postPage, dictPage, modulePage, loginLogList, operLogList, riskList] =
+        await Promise.all([
+          requestUsers(),
+          sysApi.roles(),
+          sysApi.menus(),
+          sysApi.depts(),
+          sysApi.posts(),
+          sysApi.dictTypes(),
+          sysApi.modules(),
+          sysApi.loginLogs(),
+          sysApi.operLogs(),
+          sysApi.riskRecords()
+        ])
+      const currentDictCode =
+        activeDictCode.value && dictPage.records.some((item) => String(item.dictCode) === activeDictCode.value)
+          ? activeDictCode.value
+          : String(dictPage.records[0]?.dictCode ?? '')
+
+      Object.assign(state, {
+        roles: rolePage.records,
+        menus: menuTree,
+        depts: deptTree,
+        posts: postPage.records,
+        dictTypes: dictPage.records,
+        modules: modulePage.records,
+        loginLogs: loginLogList,
+        operLogs: operLogList,
+        riskRecords: riskList
+      })
+      applyUserPage(userPage)
+      activeDictCode.value = currentDictCode
+      state.dictItems = currentDictCode ? await sysApi.dictItems(currentDictCode) : []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function loadUsers(options: { showLoading?: boolean } = {}): Promise<void> {
+    const { showLoading = true } = options
+    if (showLoading) {
+      loading.value = true
+    }
+    try {
+      applyUserPage(await requestUsers())
+    } finally {
+      if (showLoading) {
+        loading.value = false
       }
+    }
+  }
+
+  async function searchUsers(): Promise<void> {
+    userPagination.pageNo = 1
+    await loadUsers()
+  }
+
+  async function resetUserQuery(): Promise<void> {
+    userQuery.username = ''
+    userQuery.nickname = ''
+    userQuery.phone = ''
+    userQuery.status = ''
+    userPagination.pageNo = 1
+    await loadUsers()
+  }
+
+  async function handleUserPageChange(pagination: TablePagination): Promise<void> {
+    userPagination.pageNo = pagination.pageNo
+    userPagination.pageSize = pagination.pageSize
+    await loadUsers()
+  }
+
+  function handleUserSelectionChange(rows: UserView[]): void {
+    selectedUsers.value = rows
+  }
+
+  function prepareUserPageAfterDelete(deletedCount: number): void {
+    if (userPagination.pageNo > 1 && deletedCount >= state.users.length) {
+      userPagination.pageNo = Math.max(1, userPagination.pageNo - 1)
+    }
+  }
+
+  async function deleteSelectedUsers(): Promise<void> {
+    if (!selectedUsers.value.length) {
+      ElMessage.warning('请先选择要删除的用户')
+      return
+    }
+
+    const rows = [...selectedUsers.value]
+    try {
+      await ElMessageBox.confirm(`确认删除选中的 ${rows.length} 个用户吗？`, '删除确认', { type: 'warning' })
+    } catch {
+      return
+    }
+
+    loading.value = true
+    try {
+      for (const row of rows) {
+        await sysApi.deleteUser(row.id)
+      }
+      ElMessage.success('删除成功')
+      prepareUserPageAfterDelete(rows.length)
+      await loadUsers({ showLoading: false })
+    } catch (error) {
+      showActionError(error)
+      await loadUsers({ showLoading: false })
     } finally {
       loading.value = false
     }
@@ -318,11 +454,21 @@ export function useSysManagement() {
       return
     }
     userDialogVisible.value = false
-    await loadAll()
+    if (!editingUserId.value) {
+      userPagination.pageNo = 1
+    }
+    await loadUsers()
   }
 
   async function deleteUser(row: UserView): Promise<void> {
-    await confirmDelete(`确认删除用户 ${row.username} 吗？`, async () => sysApi.deleteUser(row.id))
+    await confirmDelete(
+      `确认删除用户 ${row.username} 吗？`,
+      async () => sysApi.deleteUser(row.id),
+      async () => {
+        prepareUserPageAfterDelete(1)
+        await loadUsers()
+      }
+    )
   }
 
   function openRoleDialog(row?: RoleView): void {
@@ -377,7 +523,7 @@ export function useSysManagement() {
       return
     }
     permissionDialogVisible.value = false
-    await loadAll()
+    await loadUsers()
   }
 
   function openMenuDialog(row?: TreeNodeView): void {
@@ -539,6 +685,9 @@ export function useSysManagement() {
     activeRoute,
     activeDictCode,
     state,
+    userQuery,
+    userPagination,
+    userSelectionCount,
     sysMenus,
     breadcrumbs,
     profileDialogVisible,
@@ -578,6 +727,11 @@ export function useSysManagement() {
     operLogColumns,
     riskColumns,
     loadAll,
+    loadUsers,
+    searchUsers,
+    resetUserQuery,
+    handleUserPageChange,
+    handleUserSelectionChange,
     reloadDictItems,
     syncRoute,
     resolveSysMenus,
@@ -585,6 +739,7 @@ export function useSysManagement() {
     submitPassword,
     openUserDialog,
     saveUser,
+    deleteSelectedUsers,
     deleteUser,
     openRoleDialog,
     saveRole,

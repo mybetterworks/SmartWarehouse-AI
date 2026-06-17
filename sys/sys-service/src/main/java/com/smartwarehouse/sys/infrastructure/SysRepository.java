@@ -27,7 +27,7 @@ public interface SysRepository {
 
     void updateLoginSuccess(Long userId, String ip);
 
-    PageResult<UserView> pageUsers(PageQuery query);
+    PageResult<UserView> pageUsers(PageQuery query, UserQueryRequest request);
 
     UserView saveUser(Long id, UserSaveRequest request);
 

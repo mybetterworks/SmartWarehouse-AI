@@ -22,8 +22,8 @@ public class SysManagementService {
         this.repository = repository;
     }
 
-    public PageResult<UserView> users(PageQuery query) {
-        return repository.pageUsers(query);
+    public PageResult<UserView> users(PageQuery query, UserQueryRequest request) {
+        return repository.pageUsers(query, request);
     }
 
     public UserView saveUser(Long id, UserSaveRequest request) {

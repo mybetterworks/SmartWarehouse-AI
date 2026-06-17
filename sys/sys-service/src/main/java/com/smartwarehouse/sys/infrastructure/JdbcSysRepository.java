@@ -15,6 +15,7 @@ import java.security.MessageDigest;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -117,15 +118,27 @@ public class JdbcSysRepository implements SysRepository {
     }
 
     @Override
-    public PageResult<UserView> pageUsers(PageQuery query) {
-        long total = count("select count(*) from sys_user where deleted = 0");
-        List<UserView> records = jdbc.query("""
+    public PageResult<UserView> pageUsers(PageQuery query, UserQueryRequest request) {
+        StringBuilder whereSql = new StringBuilder(" where deleted = 0");
+        List<Object> args = new ArrayList<>();
+        appendUserLikeFilter(whereSql, args, "username", request == null ? null : request.username());
+        appendUserLikeFilter(whereSql, args, "nickname", request == null ? null : request.nickname());
+        appendUserLikeFilter(whereSql, args, "phone", request == null ? null : request.phone());
+        appendUserStatusFilter(whereSql, args, request == null ? null : request.status());
+
+        long total = count("select count(*) from sys_user" + whereSql, args.toArray());
+        List<Object> pageArgs = new ArrayList<>(args);
+        pageArgs.add(query.pageSize());
+        pageArgs.add(offset(query));
+
+        String userPageSql = """
                 select id, username, password, nickname, phone, email, dept_id, post_id, status, last_login_time, last_login_ip
                 from sys_user
-                where deleted = 0
+                """ + "\n" + whereSql + "\n" + """
                 order by id
                 limit ? offset ?
-                """, userRecordMapper(), query.pageSize(), offset(query)).stream().map(this::toUserView).toList();
+                """;
+        List<UserView> records = jdbc.query(userPageSql, userRecordMapper(), pageArgs.toArray()).stream().map(this::toUserView).toList();
         return new PageResult<>(records, total, query.pageNo(), query.pageSize());
     }
 
@@ -860,8 +873,24 @@ public class JdbcSysRepository implements SysRepository {
         }
     }
 
-    private long count(String sql) {
-        Long value = jdbc.queryForObject(sql, Long.class);
+    private void appendUserLikeFilter(StringBuilder whereSql, List<Object> args, String column, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        whereSql.append(" and lower(").append(column).append(") like ?");
+        args.add("%" + value.trim().toLowerCase() + "%");
+    }
+
+    private void appendUserStatusFilter(StringBuilder whereSql, List<Object> args, String status) {
+        if (status == null || status.isBlank()) {
+            return;
+        }
+        whereSql.append(" and status = ?");
+        args.add(status.trim().toUpperCase());
+    }
+
+    private long count(String sql, Object... args) {
+        Long value = jdbc.queryForObject(sql, Long.class, args);
         return value == null ? 0 : value;
     }
 

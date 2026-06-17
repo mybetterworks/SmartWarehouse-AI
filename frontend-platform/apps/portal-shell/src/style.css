@@ -16,6 +16,20 @@ body {
   font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
+.sw-layout__header-left .sw-breadcrumb .el-breadcrumb__inner {
+  font-size: 15px;
+}
+
+.sw-layout__header-left .sw-breadcrumb .el-breadcrumb__item:first-child .el-breadcrumb__inner {
+  color: #111827;
+  font-weight: 700;
+}
+
+.sw-layout__header-left .sw-breadcrumb .el-breadcrumb__item:not(:first-child) .el-breadcrumb__inner,
+.sw-layout__header-left .sw-breadcrumb .el-breadcrumb__separator {
+  color: #475569;
+}
+
 .portal-login {
   min-height: 100vh;
   min-height: 100dvh;

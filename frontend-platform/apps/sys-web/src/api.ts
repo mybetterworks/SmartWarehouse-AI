@@ -32,6 +32,17 @@ export interface UserView extends Record<string, unknown> {
   status: string
   roles: string[]
   warehouseIds: number[]
+  lastLoginTime?: string
+  lastLoginIp?: string
+}
+
+export interface UserListQuery extends Record<string, string | number | boolean | undefined | null> {
+  pageNo?: number
+  pageSize?: number
+  username?: string
+  nickname?: string
+  phone?: string
+  status?: string
 }
 
 export interface RoleView extends Record<string, unknown> {
@@ -228,7 +239,7 @@ export function loadMenus(): Promise<MenuItem[]> {
 }
 
 export const sysApi = {
-  users: () => request<PageResult<UserView>>({ url: '/sys/users' }),
+  users: (params?: UserListQuery) => request<PageResult<UserView>>({ url: '/sys/users', params }),
   saveUser: (id: number | undefined, body: UserForm) =>
     request<UserView>({ url: id ? `/sys/users/${id}` : '/sys/users', method: id ? 'PUT' : 'POST', body }),
   deleteUser: (id: number) => request<void>({ url: `/sys/users/${id}`, method: 'DELETE' }),

@@ -706,3 +706,226 @@ corepack pnpm --filter @smartwarehouse/component-docs build
 4. standalone `sys-web` 可独立登录，并使用新的左侧菜单布局。
 5. standalone `wms/mes/ai` 不出现 host 专属入口报错。
 6. 模块抽屉可搜索、可切换模块，在当前少模块场景下不显空荡。
+
+## 14. 2026-06-20 Jenkins LTS JDK17 + DooD 本地构建发布
+
+本节记录本地 Docker Desktop 中使用 `jenkins/jenkins:lts-jdk17` 构建 SmartWarehouse-AI 的手动实现过程。该方案不使用 `jenkinsci/blueocean`，Jenkins 容器通过 Docker Outside of Docker 方式挂载 Docker socket，调用本地 Docker Desktop 完成镜像构建和本地测试环境启动。
+
+### 14.1 构建 Jenkins 镜像
+
+仓库提供 `deploy/jenkins/Dockerfile`，基于 `jenkins/jenkins:lts-jdk17`，安装 Docker CLI、Docker Compose 插件、curl、git、基础 shell 工具和 Jenkins 常用流水线插件，不写入任何真实凭证。Maven 和 Node 不内置在 Jenkins 控制器镜像中，流水线通过 DooD 启动 `maven:3.9-eclipse-temurin-17` 与 `node:22` 临时工具容器执行构建。
+
+```powershell
+cd E:\Code\codex\SmartWarehouse-AI
+docker build -f deploy/jenkins/Dockerfile -t smartwarehouse/jenkins:lts-jdk17 .
+```
+
+### 14.2 启动 Jenkins
+
+Jenkins 仅用于本地或局域网构建测试，不要映射到公网。`--user root` 只用于本地演示场景，目的是让 Jenkins 容器可以访问 Docker Desktop 的 Docker socket。
+
+```powershell
+docker volume create smartwarehouse_jenkins_home
+
+docker rm -f smartwarehouse-jenkins 2>$null
+
+docker run -d `
+  --name smartwarehouse-jenkins `
+  --restart unless-stopped `
+  --user root `
+  -e HOME=/var/jenkins_home `
+  -p 8080:8080 `
+  -p 50000:50000 `
+  -v smartwarehouse_jenkins_home:/var/jenkins_home `
+  -v /var/run/docker.sock:/var/run/docker.sock `
+  -v "${PWD}:/workspace/SmartWarehouse-AI:ro" `
+  smartwarehouse/jenkins:lts-jdk17
+```
+
+说明：
+
+1. `smartwarehouse_jenkins_home` 是 Jenkins 持久化目录，保存 Jenkins 初始化状态、任务配置和构建记录。
+2. `/var/run/docker.sock` 让 Jenkins 通过 DooD 调用本机 Docker Desktop。
+3. `HOME=/var/jenkins_home` 让 root 用户运行 Jenkins 时的 Git 全局配置写入持久化卷。
+4. `/workspace/SmartWarehouse-AI:ro` 是当前项目的只读挂载，便于 Jenkins Pipeline 使用本机 Git 仓库做 SCM checkout；该方式只会读取已提交内容，未提交修改不会进入构建。
+5. 如果后续改用 GitHub 仓库地址作为 SCM，可以保留该只读挂载，也可以在重建容器时移除它。
+
+获取初始化密码：
+
+```powershell
+docker exec smartwarehouse-jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+```
+
+浏览器打开：
+
+```text
+http://127.0.0.1:8080
+```
+
+初始化 Jenkins 后，新建 Pipeline 任务，指向代码仓库，脚本路径使用：
+
+```text
+deploy/jenkins/Jenkinsfile
+```
+
+推荐任务配置：
+
+1. 浏览器打开 `http://127.0.0.1:8080`，使用初始化密码完成 Jenkins 首次初始化。
+2. 创建管理员账号，密码只保存在 Jenkins 本地，不写入文档、仓库或 Jenkinsfile。
+3. 新建任务，名称建议 `smartwarehouse-local-cicd`，类型选择 `Pipeline`。
+4. `Definition` 选择 `Pipeline script from SCM`。
+5. `SCM` 选择 `Git`。
+6. 如果使用本机只读挂载仓库，`Repository URL` 填 `/workspace/SmartWarehouse-AI`。
+7. 如果使用 GitHub，`Repository URL` 填 GitHub 仓库地址；私有仓库凭证放入 Jenkins Credentials。
+8. `Branches to build` 按当前分支填写，例如 `*/main`、`*/master` 或实际开发分支。
+9. `Script Path` 填 `deploy/jenkins/Jenkinsfile`。
+10. 保存后点击 `Build Now` 手动触发构建。
+
+本地当前环境已在 `smartwarehouse_jenkins_home` 中预创建 `smartwarehouse-local-cicd` 任务配置；完成 Jenkins 首次初始化后，若首页能看到该任务，可以直接进入任务页点击 `Build Now`。如果任务未出现，就按上面的推荐任务配置手动创建一次。
+
+本机仓库 Git 安全目录配置：
+
+```powershell
+docker exec smartwarehouse-jenkins git config --global --add safe.directory /workspace/SmartWarehouse-AI
+```
+
+容器级验证命令：
+
+```powershell
+docker ps --filter name=smartwarehouse-jenkins
+docker exec smartwarehouse-jenkins docker version
+docker exec smartwarehouse-jenkins docker compose version
+docker exec smartwarehouse-jenkins test -f /workspace/SmartWarehouse-AI/deploy/jenkins/Jenkinsfile
+```
+
+首次构建前建议预拉取工具镜像，避免第一次点击 `Build Now` 时把时间耗在 Docker Hub 下载上：
+
+```powershell
+docker pull maven:3.9-eclipse-temurin-17
+docker pull node:22
+```
+
+工具容器挂载验证：
+
+```powershell
+docker run --rm --volumes-from smartwarehouse-jenkins `
+  -v smartwarehouse_maven_cache:/root/.m2 `
+  -w /workspace/SmartWarehouse-AI `
+  maven:3.9-eclipse-temurin-17 mvn -version
+
+docker run --rm --volumes-from smartwarehouse-jenkins `
+  -v smartwarehouse_pnpm_store:/pnpm-store `
+  -w /workspace/SmartWarehouse-AI/frontend-platform `
+  node:22 bash -lc "node -v && corepack --version && test -f package.json"
+```
+
+Jenkins 通过挂载 `/var/run/docker.sock` 调用本地 Docker Desktop；Docker CLI 在 Jenkins 容器内执行，Maven 与 pnpm 构建在 sibling 工具容器中执行。工具容器通过 `--volumes-from` 共享 Jenkins 容器的 `/var/jenkins_home` 卷，从而访问 SCM checkout 后的 workspace，并使用命名卷缓存 Maven 与 pnpm 依赖。
+
+当前 Jenkinsfile 为了和已存在的本地开发栈共存，默认让 Jenkins 专用中间件使用另一组宿主机端口：MySQL `23306`、Redis `26381`、RabbitMQ `25673/35673`、Nacos `28848/29848`。应用访问入口仍固定为 Gateway `9200`、Sys `9201`、Portal `5174`、Sys Web `5175`。如果停止了 `deploy/local/docker-compose.yml` 的本地中间件，也可以把 Jenkinsfile 中的端口改回 Compose 文件默认值 `13306/16381/5673/15673/18848/19848`。
+
+### 14.3 Jenkins 流水线职责
+
+当前 `deploy/jenkins/Jenkinsfile` 已改为 Linux `sh` 流水线，阶段如下：
+
+```text
+Checkout
+Docker Info
+Local Middleware Up
+Init MySQL
+Java Test
+Java Package
+Frontend Install
+Frontend Build
+Docker Build
+Local Test Deploy
+Health Check
+Archive
+```
+
+关键约定：
+
+1. Maven 测试和打包使用 `maven:3.9-eclipse-temurin-17` 工具容器，并用 `smartwarehouse_maven_cache` 命名卷缓存 `.m2`。
+2. 前端安装和构建使用 `node:22` 工具容器，启用 Corepack 与 `pnpm@10.12.1`，并用 `smartwarehouse_pnpm_store` 命名卷缓存 pnpm store。
+3. Jenkins 专用本地测试环境使用 `deploy/jenkins/docker-compose.local-test.yml`。
+4. Compose 使用命名卷保存测试数据，避免依赖 Jenkins workspace 里的宿主机路径。
+5. MySQL 初始化由 `Init MySQL` 阶段执行 `deploy/mysql/init-sys-db.sql`，不通过 bind mount 注入。
+6. 后端和前端镜像同时打构建号 tag 和 `test` tag，例如 `smartwarehouse/gateway-service:test`。
+7. 当前 Jenkinsfile 默认使用 Jenkins 专用中间件端口 `23306/26381/25673/35673/28848/29848`，避免与 `deploy/local/docker-compose.yml` 的默认端口冲突。
+
+### 14.4 本地测试服务访问地址
+
+Jenkins 健康检查在容器内使用 `http://host.docker.internal` 访问宿主机映射端口；开发者浏览器使用 `127.0.0.1` 访问：
+
+```text
+http://127.0.0.1:5174/
+http://127.0.0.1:5175/apps/sys/
+http://127.0.0.1:5175/apps/sys/assets/remoteEntry.js
+http://127.0.0.1:9200/actuator/health
+http://127.0.0.1:9201/actuator/health
+http://127.0.0.1:9200/api/sys/auth/risk-state?username=admin
+```
+
+`portal-shell` 与 `sys-web` 分别运行在不同端口，浏览器加载 `remoteEntry.js` 属于跨端口动态 import；`frontend-platform/apps/sys-web/deploy/nginx.conf` 已为 `/apps/sys/` 增加 CORS 响应头。若调整该 Nginx 配置，需要重新构建 `smartwarehouse/sys-web:test` 并重启 sys-web 容器，否则可能出现 curl 可访问但浏览器微前端加载失败的情况。
+
+浏览器验收：
+
+1. 打开 `http://127.0.0.1:5174/`。
+2. 使用本地演示账号 `admin / 123456` 登录。
+3. 点击系统管理，确认进入门户内 `/sys/users` 页面。
+4. 打开 `http://127.0.0.1:5175/apps/sys/`，确认 sys-web 独立入口可访问。
+5. 使用 `wms_manager / 123456` 登录门户，确认只显示 WMS 授权模块，系统管理不可见或不可访问。
+
+### 14.5 后续更新发布步骤
+
+本地测试发布流程：
+
+```text
+1. 开发者提交代码到 Git。
+2. Jenkins Pipeline 执行 Checkout。
+3. Jenkins 启动 MySQL、Redis、RabbitMQ、Nacos。
+4. Jenkins 初始化 MySQL 测试数据。
+5. Jenkins 执行 Maven 测试和打包。
+6. Jenkins 执行 pnpm install 与 portal-shell/sys-web 构建。
+7. Jenkins 构建 gateway-service、sys-service、portal-shell、sys-web 镜像。
+8. Jenkins 启动本地测试服务。
+9. Jenkins 执行 HTTP 健康检查。
+10. 开发者用浏览器完成页面验收。
+```
+
+后续发布到家用 Ubuntu 服务器时，可以在当前流水线后追加 SSH 发布阶段：
+
+```text
+1. Jenkins 将通过测试的镜像保存为 tar，或推送到私有镜像仓库。
+2. Jenkins 通过 SSH 连接家用 Ubuntu 部署机。
+3. Ubuntu 部署机执行 docker load 或 docker compose pull。
+4. Ubuntu 部署机执行 docker compose up -d。
+5. Jenkins 检查公网域名首页、remoteEntry、gateway health 和 sys health。
+```
+
+### 14.6 敏感信息边界
+
+禁止写入仓库或 Jenkinsfile 的内容：
+
+```text
+真实公网 IP
+真实 DDNS Token
+真实 Jenkins 管理员密码
+真实数据库生产密码
+真实 JWT Secret
+真实阿里云 AccessKey
+真实 npm token
+真实 Docker Registry 凭证
+私钥内容
+```
+
+文档、Compose 和 Jenkinsfile 只允许使用本地演示默认值或占位符，例如：
+
+```text
+<JWT_SECRET>
+<DB_PASSWORD>
+<JENKINS_ADMIN_PASSWORD>
+<REGISTRY_USERNAME>
+<REGISTRY_PASSWORD>
+```
+
+真实值必须通过 Jenkins Credentials、服务器本地 `.env`、Docker Secret、Kubernetes Secret 或被 Git 忽略的本地配置文件注入。

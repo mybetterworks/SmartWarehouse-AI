@@ -85,9 +85,44 @@ CREATE TABLE IF NOT EXISTS sys_frontend_module (
   KEY idx_sys_frontend_module_status(status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-ALTER TABLE sys_frontend_module ADD COLUMN IF NOT EXISTS remote_name VARCHAR(128) AFTER entry_url;
-ALTER TABLE sys_frontend_module ADD COLUMN IF NOT EXISTS remote_entry VARCHAR(255) AFTER remote_name;
-ALTER TABLE sys_frontend_module ADD COLUMN IF NOT EXISTS exposed_module VARCHAR(128) DEFAULT './RemoteApp' AFTER remote_entry;
+SET @add_remote_name = (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE sys_frontend_module ADD COLUMN remote_name VARCHAR(128) AFTER entry_url',
+    'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'sys_frontend_module'
+    AND COLUMN_NAME = 'remote_name'
+);
+PREPARE stmt FROM @add_remote_name;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @add_remote_entry = (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE sys_frontend_module ADD COLUMN remote_entry VARCHAR(255) AFTER remote_name',
+    'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'sys_frontend_module'
+    AND COLUMN_NAME = 'remote_entry'
+);
+PREPARE stmt FROM @add_remote_entry;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @add_exposed_module = (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE sys_frontend_module ADD COLUMN exposed_module VARCHAR(128) DEFAULT ''./RemoteApp'' AFTER remote_entry',
+    'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'sys_frontend_module'
+    AND COLUMN_NAME = 'exposed_module'
+);
+PREPARE stmt FROM @add_exposed_module;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS sys_portal_notice (
   id BIGINT PRIMARY KEY,

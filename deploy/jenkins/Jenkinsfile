@@ -7,8 +7,29 @@ pipeline {
   }
 
   environment {
+    COMPOSE_FILE = 'deploy/jenkins/docker-compose.local-test.yml'
+    MAVEN_IMAGE = 'maven:3.9-eclipse-temurin-17'
+    NODE_IMAGE = 'node:22'
+    MAVEN_CACHE_VOLUME = 'smartwarehouse_maven_cache'
+    PNPM_STORE_VOLUME = 'smartwarehouse_pnpm_store'
     MAVEN_OPTS = '-Dfile.encoding=UTF-8'
     NODE_OPTIONS = '--max-old-space-size=4096'
+    MYSQL_ROOT_PASSWORD = 'smart_root_dev'
+    MYSQL_APP_USER = 'smart_sys'
+    MYSQL_APP_PASSWORD = 'smart_sys_dev'
+    MYSQL_PORT = '23306'
+    REDIS_PORT = '26381'
+    RABBITMQ_PORT = '25673'
+    RABBITMQ_MANAGEMENT_PORT = '35673'
+    NACOS_PORT = '28848'
+    NACOS_GRPC_PORT = '29848'
+    SMARTWAREHOUSE_JWT_SECRET = 'change-me-in-local-jenkins-only-at-least-32chars'
+    SMARTWAREHOUSE_DEMO_PASSWORD = '123456'
+    SMARTWAREHOUSE_HOST_CHECK_BASE = 'http://host.docker.internal'
+    SMARTWAREHOUSE_TEST_DATASOURCE_URL = 'jdbc:mysql://host.docker.internal:23306/smart_sys?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai'
+    SMARTWAREHOUSE_TEST_REDIS_HOST = 'host.docker.internal'
+    SMARTWAREHOUSE_TEST_REDIS_PORT = '26381'
+    SMARTWAREHOUSE_TEST_NACOS_SERVER_ADDR = 'host.docker.internal:28848'
   }
 
   stages {
@@ -18,65 +39,214 @@ pipeline {
       }
     }
 
+    stage('Docker Info') {
+      steps {
+        sh '''
+          set -eu
+          docker version
+          docker compose version
+          docker volume create "$MAVEN_CACHE_VOLUME" >/dev/null
+          docker volume create "$PNPM_STORE_VOLUME" >/dev/null
+
+          JENKINS_CONTAINER_ID="$(cat /etc/hostname)"
+          docker run --rm \
+            --volumes-from "$JENKINS_CONTAINER_ID" \
+            -v "$MAVEN_CACHE_VOLUME:/root/.m2" \
+            -w "$WORKSPACE" \
+            "$MAVEN_IMAGE" \
+            mvn -version
+
+          docker run --rm \
+            --volumes-from "$JENKINS_CONTAINER_ID" \
+            -v "$PNPM_STORE_VOLUME:/pnpm-store" \
+            -w "$WORKSPACE/frontend-platform" \
+            "$NODE_IMAGE" \
+            bash -lc 'node -v && corepack --version'
+        '''
+      }
+    }
+
     stage('Local Middleware Up') {
       steps {
-        // 自动测试必须和人工启动使用同一套本地明确配置，先启动 SmartWarehouse-AI 专属中间件。
-        bat 'docker compose -f deploy/local/docker-compose.yml up -d mysql redis rabbitmq nacos'
-        bat 'docker compose -f deploy/local/docker-compose.yml ps'
+        sh '''
+          set -eu
+          docker compose -f "$COMPOSE_FILE" up -d mysql redis rabbitmq nacos
+
+          wait_healthy() {
+            service="$1"
+            for i in $(seq 1 60); do
+              cid="$(docker compose -f "$COMPOSE_FILE" ps -q "$service" || true)"
+              if [ -n "$cid" ]; then
+                status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" 2>/dev/null || true)"
+                if [ "$status" = "healthy" ] || [ "$status" = "running" ]; then
+                  echo "$service is $status"
+                  return 0
+                fi
+              fi
+              sleep 5
+            done
+            docker compose -f "$COMPOSE_FILE" ps
+            docker compose -f "$COMPOSE_FILE" logs --tail=120 "$service"
+            exit 1
+          }
+
+          wait_healthy mysql
+          wait_healthy redis
+          wait_healthy rabbitmq
+          wait_healthy nacos
+          docker compose -f "$COMPOSE_FILE" ps
+        '''
+      }
+    }
+
+    stage('Init MySQL') {
+      steps {
+        sh '''
+          set -eu
+          docker compose -f "$COMPOSE_FILE" exec -T mysql sh -c 'mysql --default-character-set=utf8mb4 -uroot -p"$MYSQL_ROOT_PASSWORD"' < deploy/mysql/init-sys-db.sql
+          docker compose -f "$COMPOSE_FILE" exec -T mysql sh -c 'mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "select username,status from sys_user; select module_code,status,remote_entry from sys_frontend_module;"'
+        '''
       }
     }
 
     stage('Java Test') {
       steps {
-        bat 'mvn test'
+        sh '''
+          set -eu
+          JENKINS_CONTAINER_ID="$(cat /etc/hostname)"
+          docker run --rm \
+            --volumes-from "$JENKINS_CONTAINER_ID" \
+            --add-host=host.docker.internal:host-gateway \
+            -v "$MAVEN_CACHE_VOLUME:/root/.m2" \
+            -w "$WORKSPACE" \
+            -e MAVEN_OPTS="$MAVEN_OPTS" \
+            -e SMARTWAREHOUSE_SYS_DATASOURCE_URL="$SMARTWAREHOUSE_TEST_DATASOURCE_URL" \
+            -e SMARTWAREHOUSE_SYS_DATASOURCE_USERNAME="$MYSQL_APP_USER" \
+            -e SMARTWAREHOUSE_SYS_DATASOURCE_PASSWORD="$MYSQL_APP_PASSWORD" \
+            -e SMARTWAREHOUSE_REDIS_HOST="$SMARTWAREHOUSE_TEST_REDIS_HOST" \
+            -e SMARTWAREHOUSE_REDIS_PORT="$SMARTWAREHOUSE_TEST_REDIS_PORT" \
+            -e SMARTWAREHOUSE_NACOS_SERVER_ADDR="$SMARTWAREHOUSE_TEST_NACOS_SERVER_ADDR" \
+            -e SMARTWAREHOUSE_JWT_SECRET="$SMARTWAREHOUSE_JWT_SECRET" \
+            -e SMARTWAREHOUSE_DEMO_PASSWORD="$SMARTWAREHOUSE_DEMO_PASSWORD" \
+            "$MAVEN_IMAGE" \
+            mvn test
+        '''
+      }
+    }
+
+    stage('Java Package') {
+      steps {
+        sh '''
+          set -eu
+          JENKINS_CONTAINER_ID="$(cat /etc/hostname)"
+          docker run --rm \
+            --volumes-from "$JENKINS_CONTAINER_ID" \
+            -v "$MAVEN_CACHE_VOLUME:/root/.m2" \
+            -w "$WORKSPACE" \
+            -e MAVEN_OPTS="$MAVEN_OPTS" \
+            "$MAVEN_IMAGE" \
+            mvn package -DskipTests
+        '''
       }
     }
 
     stage('Frontend Install') {
       steps {
-        dir('frontend-platform') {
-          bat 'corepack pnpm install --frozen-lockfile'
-        }
+        sh '''
+          set -eu
+          JENKINS_CONTAINER_ID="$(cat /etc/hostname)"
+          docker run --rm \
+            --volumes-from "$JENKINS_CONTAINER_ID" \
+            -v "$PNPM_STORE_VOLUME:/pnpm-store" \
+            -w "$WORKSPACE/frontend-platform" \
+            -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+            -e NODE_OPTIONS="$NODE_OPTIONS" \
+            "$NODE_IMAGE" \
+            bash -lc 'corepack enable && corepack prepare pnpm@10.12.1 --activate && pnpm config set store-dir /pnpm-store && pnpm install --frozen-lockfile'
+        '''
       }
     }
 
     stage('Frontend Build') {
       steps {
-        dir('frontend-platform') {
-          bat 'corepack pnpm build'
-        }
+        sh '''
+          set -eu
+          JENKINS_CONTAINER_ID="$(cat /etc/hostname)"
+          docker run --rm \
+            --volumes-from "$JENKINS_CONTAINER_ID" \
+            -v "$PNPM_STORE_VOLUME:/pnpm-store" \
+            -w "$WORKSPACE/frontend-platform" \
+            -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+            -e NODE_OPTIONS="$NODE_OPTIONS" \
+            "$NODE_IMAGE" \
+            bash -lc 'corepack enable && corepack prepare pnpm@10.12.1 --activate && pnpm config set store-dir /pnpm-store && pnpm build:packages && pnpm --filter @smartwarehouse/portal-shell build && pnpm --filter @smartwarehouse/sys-web build'
+        '''
       }
     }
 
     stage('Docker Build') {
       steps {
-        bat 'docker build -f gateway/deploy/Dockerfile -t smartwarehouse/gateway-service:%BUILD_NUMBER% .'
-        bat 'docker build -f sys/deploy/Dockerfile -t smartwarehouse/sys-service:%BUILD_NUMBER% .'
-        bat 'docker build -f frontend-platform/apps/portal-shell/deploy/Dockerfile -t smartwarehouse/portal-shell:%BUILD_NUMBER% .'
-        bat 'docker build -f frontend-platform/apps/sys-web/deploy/Dockerfile -t smartwarehouse/sys-web:%BUILD_NUMBER% .'
+        sh '''
+          set -eu
+          docker build -f gateway/deploy/Dockerfile -t smartwarehouse/gateway-service:"$BUILD_NUMBER" -t smartwarehouse/gateway-service:test .
+          docker build -f sys/deploy/Dockerfile -t smartwarehouse/sys-service:"$BUILD_NUMBER" -t smartwarehouse/sys-service:test .
+          docker build -f frontend-platform/apps/portal-shell/deploy/Dockerfile -t smartwarehouse/portal-shell:"$BUILD_NUMBER" -t smartwarehouse/portal-shell:test .
+          docker build -f frontend-platform/apps/sys-web/deploy/Dockerfile -t smartwarehouse/sys-web:"$BUILD_NUMBER" -t smartwarehouse/sys-web:test .
+        '''
       }
     }
 
     stage('Local Test Deploy') {
       steps {
-        dir('deploy/local') {
-          bat 'docker compose up -d'
-        }
+        sh '''
+          set -eu
+          docker compose -f "$COMPOSE_FILE" up -d --force-recreate sys-service gateway-service portal-shell sys-web
+          docker compose -f "$COMPOSE_FILE" ps
+        '''
       }
     }
 
     stage('Health Check') {
       steps {
-        bat 'curl -f http://127.0.0.1:9200/actuator/health'
-        bat 'curl -f http://127.0.0.1:9201/actuator/health'
+        sh '''
+          set -eu
+          check_url() {
+            url="$1"
+            for i in $(seq 1 60); do
+              if curl -fsS "$url" >/dev/null; then
+                echo "OK $url"
+                return 0
+              fi
+              sleep 3
+            done
+            docker compose -f "$COMPOSE_FILE" ps
+            docker compose -f "$COMPOSE_FILE" logs --tail=160 gateway-service sys-service portal-shell sys-web
+            echo "Failed health check: $url" >&2
+            exit 1
+          }
+
+          check_url "$SMARTWAREHOUSE_HOST_CHECK_BASE:9200/actuator/health"
+          check_url "$SMARTWAREHOUSE_HOST_CHECK_BASE:9201/actuator/health"
+          check_url "$SMARTWAREHOUSE_HOST_CHECK_BASE:5174/"
+          check_url "$SMARTWAREHOUSE_HOST_CHECK_BASE:5175/apps/sys/assets/remoteEntry.js"
+          check_url "$SMARTWAREHOUSE_HOST_CHECK_BASE:9200/api/sys/auth/risk-state?username=admin"
+        '''
+      }
+    }
+
+    stage('Archive') {
+      steps {
+        archiveArtifacts artifacts: '**/target/*.jar,frontend-platform/apps/*/dist/**', allowEmptyArchive: true
+        junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
       }
     }
   }
 
   post {
     always {
-      archiveArtifacts artifacts: '**/target/*.jar,frontend-platform/apps/*/dist/**', allowEmptyArchive: true
-      junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+      sh '''
+        docker compose -f "$COMPOSE_FILE" ps || true
+      '''
     }
   }
 }

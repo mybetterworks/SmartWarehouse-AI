@@ -151,6 +151,33 @@ CI/CD 与部署基线：
 - `gateway/deploy/Dockerfile`、`sys/deploy/Dockerfile`、`frontend-platform/apps/portal-shell/deploy/Dockerfile`、`frontend-platform/apps/sys-web/deploy/Dockerfile`：提供服务镜像构建模板。
 - `deploy/aliyun-eci/formal-release-checklist.md`：记录阿里弹性容器正式发布检查清单。
 
+Jenkins 本地构建与 ACR 正式推送：
+
+- Jenkins 使用本地持久化容器 `smartwarehouse-jenkins`，镜像为 `smartwarehouse/jenkins:lts-jdk17`，通过 Docker socket 调用 Docker Desktop 构建镜像和启动本地测试服务。
+- Pipeline 脚本路径为 `deploy/jenkins/Jenkinsfile`。首次更新参数化 Jenkinsfile 后，如果任务页面没有出现参数入口，先执行一次普通 `Build Now`，之后会出现 `Build with Parameters`。
+- 普通开发构建保持默认参数：`PUSH_ACR_RELEASE=false`、`RELEASE_VERSION` 留空、`PUSH_LATEST=false`。该模式只构建 `smartwarehouse/*:test` 本地测试镜像并启动本地测试服务，不登录 ACR、不推送 ACR。
+- 正式 ACR 发布构建使用：`PUSH_ACR_RELEASE=true`、`RELEASE_VERSION=<RELEASE_VERSION>`、`PUSH_LATEST=false`。流水线会先完成后端测试、前端构建、Docker Build、本地测试部署和健康检查，全部通过后才推送正式镜像。
+- ACR 凭证只保存在 Jenkins Credentials，凭证 ID 固定为 `aliyun-acr-smartwarehouse`，类型为 `Username with password`。仓库、Jenkinsfile 和文档中不得写入 `<ACR_USERNAME>`、`<ACR_PASSWORD>` 的真实值。
+- 正式镜像仓库只保存正式版本 tag，不保存普通开发构建的 `test` tag 或 Jenkins 构建号 tag。
+
+正式镜像地址：
+
+```text
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/gateway-service:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-service:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/portal-shell:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-web:<RELEASE_VERSION>
+```
+
+正式发布后，Jenkins 会归档 `acr-release-images.txt`，并用 `docker manifest inspect` 校验 4 个远端镜像 tag 已存在。
+
+构建成功后的本地清理策略：
+
+- Jenkins 会自动删除本次 `BUILD_NUMBER` 对应的 4 个本地镜像 tag，例如 `smartwarehouse/gateway-service:${BUILD_NUMBER}`。
+- 如果本次推送了 ACR 正式镜像，Jenkins 会在推送和远端校验成功后删除本地 ACR tag 副本。
+- Jenkins 会保留 `smartwarehouse/*:test` 镜像，因为本地测试 Compose 服务正在使用这些稳定 tag。
+- Jenkins 只执行 `docker image prune -f` 清理 dangling images，不执行 `docker image prune -a` 或 `docker system prune -a --volumes`，避免误删基础镜像、工具镜像或数据卷。
+
 V02 验证命令：
 
 ```powershell

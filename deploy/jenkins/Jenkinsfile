@@ -6,10 +6,19 @@ pipeline {
     disableConcurrentBuilds()
   }
 
+  parameters {
+    booleanParam(name: 'PUSH_ACR_RELEASE', defaultValue: false, description: 'Push formal images to Aliyun ACR only when this is true.')
+    string(name: 'RELEASE_VERSION', defaultValue: '', trim: true, description: 'Formal image version, for example v0.2.0. Required when PUSH_ACR_RELEASE=true.')
+    booleanParam(name: 'PUSH_LATEST', defaultValue: false, description: 'Also push latest. Keep false unless latest should be moved intentionally.')
+  }
+
   environment {
     COMPOSE_FILE = 'deploy/jenkins/docker-compose.local-test.yml'
     MAVEN_IMAGE = 'maven:3.9-eclipse-temurin-17'
     NODE_IMAGE = 'node:22'
+    ACR_REGISTRY = 'registry.cn-hangzhou.aliyuncs.com'
+    ACR_NAMESPACE = 'smartwarehouse'
+    ACR_CREDENTIALS_ID = 'aliyun-acr-smartwarehouse'
     MAVEN_CACHE_VOLUME = 'smartwarehouse_maven_cache'
     PNPM_STORE_VOLUME = 'smartwarehouse_pnpm_store'
     MAVEN_OPTS = '-Dfile.encoding=UTF-8'
@@ -62,6 +71,55 @@ pipeline {
             -w "$WORKSPACE/frontend-platform" \
             "$NODE_IMAGE" \
             bash -lc 'node -v && corepack --version'
+        '''
+      }
+    }
+
+    stage('Validate ACR Release') {
+      steps {
+        sh '''
+          set -eu
+
+          push_acr_release="${PUSH_ACR_RELEASE:-false}"
+          release_version_param="${RELEASE_VERSION:-}"
+          push_latest="${PUSH_LATEST:-false}"
+
+          if [ "$push_acr_release" != "true" ]; then
+            echo "PUSH_ACR_RELEASE=false, skip ACR release validation and push."
+            exit 0
+          fi
+
+          release_version="$(printf '%s' "$release_version_param" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          release_version_lower="$(printf '%s' "$release_version" | tr '[:upper:]' '[:lower:]')"
+
+          if [ -z "$release_version" ]; then
+            echo "RELEASE_VERSION is required when PUSH_ACR_RELEASE=true." >&2
+            exit 1
+          fi
+
+          case "$release_version_lower" in
+            test|dev|latest)
+              echo "RELEASE_VERSION must not be test, dev, or latest for formal ACR release." >&2
+              exit 1
+              ;;
+          esac
+
+          case "$release_version" in
+            .*|-*|*[!A-Za-z0-9_.-]*)
+              echo "RELEASE_VERSION contains invalid Docker tag characters: $release_version" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ "${#release_version}" -gt 128 ]; then
+            echo "RELEASE_VERSION is longer than Docker tag limit 128 characters." >&2
+            exit 1
+          fi
+
+          echo "ACR formal release is enabled for version: $release_version"
+          if [ "$push_latest" = "true" ]; then
+            echo "PUSH_LATEST=true, latest tag will also be pushed after versioned images."
+          fi
         '''
       }
     }
@@ -234,18 +292,103 @@ pipeline {
       }
     }
 
+    stage('ACR Release Push') {
+      when {
+        expression { return params.PUSH_ACR_RELEASE }
+      }
+      steps {
+        withCredentials([usernamePassword(credentialsId: env.ACR_CREDENTIALS_ID, usernameVariable: 'ACR_USERNAME', passwordVariable: 'ACR_PASSWORD')]) {
+          sh '''
+            set -eu
+
+            release_version_param="${RELEASE_VERSION:-}"
+            push_latest="${PUSH_LATEST:-false}"
+            release_version="$(printf '%s' "$release_version_param" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            release_file="acr-release-images.txt"
+            rm -f "$release_file"
+
+            printf '%s\\n' "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" --username "$ACR_USERNAME" --password-stdin
+
+            tag_push_and_verify() {
+              service_name="$1"
+              local_image="smartwarehouse/$service_name:test"
+              remote_image="$ACR_REGISTRY/$ACR_NAMESPACE/$service_name:$release_version"
+
+              docker tag "$local_image" "$remote_image"
+              docker push "$remote_image"
+              docker manifest inspect "$remote_image" >/dev/null
+              printf '%s\\n' "$remote_image" >> "$release_file"
+
+              if [ "$push_latest" = "true" ]; then
+                latest_image="$ACR_REGISTRY/$ACR_NAMESPACE/$service_name:latest"
+                docker tag "$local_image" "$latest_image"
+                docker push "$latest_image"
+                docker manifest inspect "$latest_image" >/dev/null
+                printf '%s\\n' "$latest_image" >> "$release_file"
+              fi
+            }
+
+            tag_push_and_verify gateway-service
+            tag_push_and_verify sys-service
+            tag_push_and_verify portal-shell
+            tag_push_and_verify sys-web
+
+            echo "ACR release images:"
+            cat "$release_file"
+          '''
+        }
+      }
+    }
+
     stage('Archive') {
       steps {
-        archiveArtifacts artifacts: '**/target/*.jar,frontend-platform/apps/*/dist/**', allowEmptyArchive: true
+        archiveArtifacts artifacts: 'acr-release-images.txt,**/target/*.jar,frontend-platform/apps/*/dist/**', allowEmptyArchive: true
         junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
       }
     }
   }
 
   post {
+    success {
+      sh '''
+        set +e
+
+        remove_image_tag() {
+          image_tag="$1"
+          if docker image inspect "$image_tag" >/dev/null 2>&1; then
+            echo "Remove local image tag: $image_tag"
+            docker rmi "$image_tag" || true
+          else
+            echo "Skip missing local image tag: $image_tag"
+          fi
+        }
+
+        for service_name in gateway-service sys-service portal-shell sys-web; do
+          remove_image_tag "smartwarehouse/$service_name:$BUILD_NUMBER"
+        done
+
+        push_acr_release="${PUSH_ACR_RELEASE:-false}"
+        push_latest="${PUSH_LATEST:-false}"
+        release_version_param="${RELEASE_VERSION:-}"
+        release_version="$(printf '%s' "$release_version_param" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+        if [ "$push_acr_release" = "true" ] && [ -n "$release_version" ]; then
+          for service_name in gateway-service sys-service portal-shell sys-web; do
+            remove_image_tag "$ACR_REGISTRY/$ACR_NAMESPACE/$service_name:$release_version"
+            if [ "$push_latest" = "true" ]; then
+              remove_image_tag "$ACR_REGISTRY/$ACR_NAMESPACE/$service_name:latest"
+            fi
+          done
+        fi
+
+        docker image prune -f || true
+      '''
+    }
+
     always {
       sh '''
         docker compose -f "$COMPOSE_FILE" ps || true
+        docker logout "$ACR_REGISTRY" || true
       '''
     }
   }

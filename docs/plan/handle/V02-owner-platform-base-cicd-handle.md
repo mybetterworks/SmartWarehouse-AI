@@ -929,3 +929,207 @@ http://127.0.0.1:9200/api/sys/auth/risk-state?username=admin
 ```
 
 真实值必须通过 Jenkins Credentials、服务器本地 `.env`、Docker Secret、Kubernetes Secret 或被 Git 忽略的本地配置文件注入。
+
+## 15. 2026-06-22 Jenkins 正式 ACR 推送手搓步骤
+
+本节记录在现有本地 Jenkins LTS JDK17 + DooD 流水线基础上，增加正式镜像推送到阿里云 ACR 的手动实现过程。该能力只服务正式版本发布；普通开发构建仍然只生成本地 `smartwarehouse/*:test` 镜像并启动本地测试服务。
+
+### 15.1 Jenkins 参数约定
+
+`deploy/jenkins/Jenkinsfile` 增加 3 个参数：
+
+```text
+PUSH_ACR_RELEASE=false
+RELEASE_VERSION=
+PUSH_LATEST=false
+```
+
+普通开发构建保持默认值：
+
+```text
+PUSH_ACR_RELEASE=false
+RELEASE_VERSION=
+PUSH_LATEST=false
+```
+
+正式 ACR 发布构建示例：
+
+```text
+PUSH_ACR_RELEASE=true
+RELEASE_VERSION=v0.2.0
+PUSH_LATEST=false
+```
+
+约束：
+
+1. `PUSH_ACR_RELEASE=false` 时，流水线不登录 ACR、不推送 ACR。
+2. `PUSH_ACR_RELEASE=true` 时，`RELEASE_VERSION` 必填。
+3. `RELEASE_VERSION` 不允许使用 `test`、`dev`、`latest`。
+4. `PUSH_LATEST` 默认保持 `false`，只有明确需要维护 latest 指针时才开启。
+5. 正式推送必须排在 `Health Check` 之后，确保本地测试服务已通过 HTTP 验收。
+
+### 15.2 Jenkins 凭证配置
+
+在 Jenkins 页面创建 ACR 凭证：
+
+```text
+类型：Username with password
+ID：aliyun-acr-smartwarehouse
+Username：<ACR_USERNAME>
+Password：<ACR_PASSWORD>
+```
+
+安全边界：
+
+1. `<ACR_USERNAME>` 和 `<ACR_PASSWORD>` 只保存在 Jenkins Credentials。
+2. 不要把 ACR 真实账号、密码、AccessKey、token 写入 Jenkinsfile、README、docs、Compose 或 `.env.example`。
+3. Jenkins 日志中只允许出现 registry 地址和镜像 tag，不允许打印密码。
+
+### 15.3 正式镜像仓库
+
+正式版本推送到以下 4 个 ACR 私有仓库：
+
+```text
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/gateway-service:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-service:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/portal-shell:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-web:<RELEASE_VERSION>
+```
+
+普通本地测试镜像仍然只保留在 Docker Desktop：
+
+```text
+smartwarehouse/gateway-service:<BUILD_NUMBER>
+smartwarehouse/gateway-service:test
+smartwarehouse/sys-service:<BUILD_NUMBER>
+smartwarehouse/sys-service:test
+smartwarehouse/portal-shell:<BUILD_NUMBER>
+smartwarehouse/portal-shell:test
+smartwarehouse/sys-web:<BUILD_NUMBER>
+smartwarehouse/sys-web:test
+```
+
+### 15.4 手动触发步骤
+
+1. 确认 `smartwarehouse-jenkins` 是持久化 Jenkins 容器，不要创建临时 Jenkins。
+2. 浏览器打开 `http://127.0.0.1:8080`。
+3. 进入 Jenkins 任务，例如 `smartwarehouse-local-cicd`。
+4. 如果页面没有 `Build with Parameters`，先点击一次普通 `Build Now`，Declarative Pipeline 会把参数写入任务配置。
+5. 正式发布时点击 `Build with Parameters`。
+6. 勾选 `PUSH_ACR_RELEASE=true`。
+7. 填写 `RELEASE_VERSION=<RELEASE_VERSION>`，例如 `v0.2.0`。
+8. 默认保持 `PUSH_LATEST=false`。
+9. 启动构建，等待本地测试和 HTTP 健康检查全部通过。
+10. 查看 `ACR Release Push` 阶段是否完成。
+11. 下载或查看归档文件 `acr-release-images.txt`。
+
+### 15.5 验证命令
+
+本地 Jenkins 容器能力检查：
+
+```powershell
+docker ps --filter name=smartwarehouse-jenkins
+docker exec smartwarehouse-jenkins docker version
+docker exec smartwarehouse-jenkins docker compose version
+```
+
+本地测试服务 HTTP 验收：
+
+```powershell
+curl -f http://127.0.0.1:9200/actuator/health
+curl -f http://127.0.0.1:9201/actuator/health
+curl -f http://127.0.0.1:5174/
+curl -f http://127.0.0.1:5175/apps/sys/assets/remoteEntry.js
+curl -f "http://127.0.0.1:9200/api/sys/auth/risk-state?username=admin"
+```
+
+远端镜像校验由 Jenkins 在 `ACR Release Push` 阶段自动执行：
+
+```text
+docker manifest inspect registry.cn-hangzhou.aliyuncs.com/smartwarehouse/gateway-service:<RELEASE_VERSION>
+docker manifest inspect registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-service:<RELEASE_VERSION>
+docker manifest inspect registry.cn-hangzhou.aliyuncs.com/smartwarehouse/portal-shell:<RELEASE_VERSION>
+docker manifest inspect registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-web:<RELEASE_VERSION>
+```
+
+### 15.6 后续更新发布步骤
+
+日常开发更新：
+
+```text
+1. 本地开发并提交代码。
+2. Jenkins 普通构建，PUSH_ACR_RELEASE=false。
+3. Jenkins 构建本地 test 镜像并启动本地测试服务。
+4. 浏览器验证通过后继续开发或准备正式发布。
+```
+
+正式版本发布：
+
+```text
+1. 确认 Git 分支、代码和版本号。
+2. Jenkins 参数化构建，PUSH_ACR_RELEASE=true。
+3. 填写 RELEASE_VERSION=<RELEASE_VERSION>。
+4. Jenkins 完成本地自动测试和 HTTP 健康检查。
+5. Jenkins 推送 4 个正式镜像到 ACR。
+6. Jenkins 归档 acr-release-images.txt。
+7. 后续由阿里弹性容器、ACK 或家用 Ubuntu 服务器按该正式镜像 tag 部署。
+```
+
+回滚原则：
+
+1. ACR 中保留每次正式发布的版本 tag。
+2. 回滚时不要重新打 `test` 镜像覆盖正式版本。
+3. 在部署平台中把镜像 tag 切回上一个已验证的 `<RELEASE_VERSION>`。
+4. 回滚后重新检查 gateway health、sys health、portal 首页和 sys-web remoteEntry。
+
+### 15.7 构建成功后的本地镜像清理
+
+Jenkins 构建成功后会自动清理本次构建产生的临时本地 tag：
+
+```text
+smartwarehouse/gateway-service:<BUILD_NUMBER>
+smartwarehouse/sys-service:<BUILD_NUMBER>
+smartwarehouse/portal-shell:<BUILD_NUMBER>
+smartwarehouse/sys-web:<BUILD_NUMBER>
+```
+
+如果本次开启 `PUSH_ACR_RELEASE=true` 且 ACR 推送成功，还会删除本地 ACR tag 副本：
+
+```text
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/gateway-service:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-service:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/portal-shell:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-web:<RELEASE_VERSION>
+```
+
+如果同时开启 `PUSH_LATEST=true`，本地 ACR `latest` tag 副本也会删除。以上清理只删除本地 Docker Desktop 上的 tag，不影响 ACR 远端仓库中的正式镜像。
+
+保留内容：
+
+```text
+smartwarehouse/gateway-service:test
+smartwarehouse/sys-service:test
+smartwarehouse/portal-shell:test
+smartwarehouse/sys-web:test
+```
+
+这些 `test` 镜像是本地 Compose 测试服务的运行入口，不自动删除。Jenkins 只额外执行 `docker image prune -f` 清理 dangling images，不执行 `docker image prune -a`，也不执行 `docker system prune -a --volumes`，避免误删基础镜像、工具镜像、Jenkins home 或 MySQL/Redis/RabbitMQ/Nacos 数据卷。
+
+### 15.8 敏感信息检查
+
+提交前必须检查：
+
+```powershell
+rg -n "AccessKey|Secret|BEGIN PRIVATE KEY|_authToken|ACR_PASSWORD|JENKINS_ADMIN_PASSWORD|DDNS|Bearer" README.md docs/plan deploy/jenkins
+```
+
+允许出现的内容仅限：
+
+```text
+<ACR_USERNAME>
+<ACR_PASSWORD>
+<RELEASE_VERSION>
+<JENKINS_ADMIN_PASSWORD>
+aliyun-acr-smartwarehouse
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse
+```

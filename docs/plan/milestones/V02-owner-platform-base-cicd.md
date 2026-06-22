@@ -644,6 +644,16 @@ Docker 镜像构建
 测试报告归档
 ```
 
+正式 ACR 推送必须作为手动参数化发布能力存在，不能在普通开发构建中自动执行。Jenkins 参数约定：
+
+```text
+PUSH_ACR_RELEASE=false   普通构建默认值，不登录 ACR、不推送 ACR
+RELEASE_VERSION=         正式版本号，PUSH_ACR_RELEASE=true 时必填
+PUSH_LATEST=false        默认不覆盖 latest
+```
+
+当 `PUSH_ACR_RELEASE=true` 时，流水线必须先完成本地 Java 测试、前端构建、Docker 镜像构建、本地 Compose 测试部署和 HTTP 健康检查，再使用 Jenkins Credentials `aliyun-acr-smartwarehouse` 推送正式镜像到 ACR。仓库中不得写入真实 ACR 用户名、密码、token 或 AccessKey。
+
 Git 提交规则：AI 可以改文件和验证，但 `commit`、`push` 必须由用户手动执行。
 
 ### 10.2 阿里弹性容器正式发布基线
@@ -659,6 +669,17 @@ Secret / 凭证注入说明
 回滚说明
 发布前检查清单
 ```
+
+正式镜像来源：
+
+```text
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/gateway-service:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-service:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/portal-shell:<RELEASE_VERSION>
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-web:<RELEASE_VERSION>
+```
+
+ACR 私有仓库只保存正式版本镜像；普通开发构建的 `smartwarehouse/*:test` 和 Jenkins 构建号 tag 只保留在本地 Docker Desktop。每次正式发布后必须归档 `acr-release-images.txt`，并通过 `docker manifest inspect` 校验远端 tag 存在。
 
 生产发布必须使用 release 依赖，测试环境可使用 snapshot 依赖。
 

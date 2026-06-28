@@ -1115,6 +1115,254 @@ smartwarehouse/sys-web:test
 
 这些 `test` 镜像是本地 Compose 测试服务的运行入口，不自动删除。Jenkins 只额外执行 `docker image prune -f` 清理 dangling images，不执行 `docker image prune -a`，也不执行 `docker system prune -a --volumes`，避免误删基础镜像、工具镜像、Jenkins home 或 MySQL/Redis/RabbitMQ/Nacos 数据卷。
 
+## 16. 2026-06-23 Ubuntu k3s + ACR 正式镜像部署手搓步骤
+
+本节记录家用 Ubuntu 服务器部署 V02 正式镜像的实际过程。服务器通过 `ssh ubuntu-service` 访问，使用单节点 k3s，业务镜像来自阿里云 ACR，公共中间件镜像使用固定版本。本文档只记录占位符和操作流程，不记录真实 ACR 凭证、JWT Secret、数据库密码、私钥或 DDNS token。
+
+### 16.1 k3s 初始化
+
+服务器基础状态：
+
+```text
+OS: Ubuntu 24.04 LTS
+CPU: 4 vCPU
+Memory: 约 11GiB
+Kubernetes: k3s v1.35.5+k3s1
+Namespace: smartwarehouse
+Public entry: edge-nginx NodePort 30080
+```
+
+安装 k3s 时禁用默认 Traefik 和 servicelb，统一使用本项目的 `edge-nginx` 暴露一个端口。国内环境拉取 Docker Hub 镜像可能超时，因此在服务器上写入 k3s registry mirror 配置：
+
+```yaml
+disable:
+  - traefik
+  - servicelb
+pause-image: docker.m.daocloud.io/rancher/mirrored-pause:3.6
+```
+
+```yaml
+mirrors:
+  docker.io:
+    endpoint:
+      - https://docker.m.daocloud.io
+      - https://docker.1ms.run
+      - https://docker.1panel.live
+      - https://registry-1.docker.io
+```
+
+验证命令：
+
+```bash
+export KUBECONFIG="$HOME/.kube/config"
+kubectl get nodes -o wide
+kubectl -n kube-system get pods -o wide
+```
+
+### 16.2 Secret 创建约定
+
+ACR 拉取凭证由开发者手动在 Ubuntu 服务器输入，不进入仓库和文档：
+
+```bash
+export KUBECONFIG="$HOME/.kube/config"
+
+read -r -p "ACR username: " ACR_USERNAME
+read -r -s -p "ACR password: " ACR_PASSWORD
+echo
+
+kubectl -n smartwarehouse create secret docker-registry acr-pull-secret \
+  --docker-server=registry.cn-hangzhou.aliyuncs.com \
+  --docker-username="$ACR_USERNAME" \
+  --docker-password="$ACR_PASSWORD" \
+  --docker-email="placeholder@example.com"
+
+unset ACR_USERNAME ACR_PASSWORD
+kubectl -n smartwarehouse get secret acr-pull-secret
+```
+
+运行时 Secret 由服务器随机生成，写入 `smartwarehouse-runtime-secret`：
+
+```text
+mysql-root-password=<DB_PASSWORD>
+mysql-app-user=smart_sys
+mysql-app-password=<DB_PASSWORD>
+rabbitmq-user=smartwarehouse
+rabbitmq-password=<RABBITMQ_PASSWORD>
+smartwarehouse-jwt-secret=<JWT_SECRET>
+```
+
+### 16.3 K8s 清单
+
+新增清单目录：
+
+```text
+deploy/k8s/home-server/
+```
+
+核心资源：
+
+```text
+00-namespace.yaml
+10-storage.yaml
+20-middleware.yaml
+30-apps.yaml
+40-edge-nginx.yaml
+50-mysql-init-job.yaml
+```
+
+部署镜像：
+
+```text
+mysql:8.4
+redis:7.4
+rabbitmq:3.13-management
+nacos/nacos-server:v2.4.3
+nginx:1.27-alpine
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/gateway-service:v0.1.0
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-service:v0.1.0
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/portal-shell:v0.1.0
+registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-web:v0.1.0
+```
+
+`edge-nginx` 统一入口：
+
+```text
+/                         -> portal-shell:80
+/apps/sys/                -> sys-web:80
+/api/                     -> gateway-service:9200
+```
+
+### 16.4 部署顺序
+
+```bash
+export KUBECONFIG="$HOME/.kube/config"
+
+kubectl apply -f deploy/k8s/home-server/00-namespace.yaml
+kubectl apply -f deploy/k8s/home-server/10-storage.yaml
+kubectl apply -f deploy/k8s/home-server/20-middleware.yaml
+
+kubectl -n smartwarehouse create configmap mysql-init-sql \
+  --from-file=init-sys-db.sql=deploy/mysql/init-sys-db.sql \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl -n smartwarehouse wait --for=condition=Ready pod -l app.kubernetes.io/part-of=smartwarehouse-ai --timeout=900s
+
+kubectl -n smartwarehouse delete job mysql-init-smart-sys --ignore-not-found=true
+kubectl apply -f deploy/k8s/home-server/50-mysql-init-job.yaml
+kubectl -n smartwarehouse wait --for=condition=complete job/mysql-init-smart-sys --timeout=600s
+
+kubectl apply -f deploy/k8s/home-server/30-apps.yaml
+kubectl apply -f deploy/k8s/home-server/40-edge-nginx.yaml
+```
+
+MySQL 初始化 Job 会导入 `deploy/mysql/init-sys-db.sql`，并把正式环境的 `remote_entry` 修正为同源路径：
+
+```text
+sys -> /apps/sys/assets/remoteEntry.js
+wms -> /apps/wms/assets/remoteEntry.js
+mes -> /apps/mes/assets/remoteEntry.js
+ai  -> /apps/ai/assets/remoteEntry.js
+```
+
+这样公网访问时浏览器不会再请求访问者本机的 `localhost:5175`。
+
+### 16.5 验收结果
+
+集群资源已验证：
+
+```bash
+kubectl -n smartwarehouse get pods -o wide
+kubectl -n smartwarehouse get pvc
+kubectl -n smartwarehouse get svc edge-nginx
+```
+
+HTTP 验收已通过：
+
+```bash
+curl -f http://<UBUNTU_LAN_IP>:30080/
+curl -f http://<UBUNTU_LAN_IP>:30080/apps/sys/assets/remoteEntry.js
+curl -f "http://<UBUNTU_LAN_IP>:30080/api/sys/auth/risk-state?username=admin"
+```
+
+集群内部健康检查已通过：
+
+```bash
+kubectl -n smartwarehouse run curl-gateway --rm -i --restart=Never --image=curlimages/curl:8.8.0 -- \
+  curl -f http://gateway-service:9200/actuator/health
+
+kubectl -n smartwarehouse run curl-sys --rm -i --restart=Never --image=curlimages/curl:8.8.0 -- \
+  curl -f http://sys-service:9201/actuator/health
+```
+
+返回结果：
+
+```text
+portal=200
+remoteEntry=200
+risk=200
+gateway health=UP
+sys health=UP
+```
+
+### 16.6 正式服务更新与回滚
+
+新版本发布流程：
+
+```bash
+RELEASE_VERSION=<RELEASE_VERSION>
+
+kubectl -n smartwarehouse set image deploy/gateway-service \
+  gateway-service=registry.cn-hangzhou.aliyuncs.com/smartwarehouse/gateway-service:${RELEASE_VERSION}
+kubectl -n smartwarehouse set image deploy/sys-service \
+  sys-service=registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-service:${RELEASE_VERSION}
+kubectl -n smartwarehouse set image deploy/portal-shell \
+  portal-shell=registry.cn-hangzhou.aliyuncs.com/smartwarehouse/portal-shell:${RELEASE_VERSION}
+kubectl -n smartwarehouse set image deploy/sys-web \
+  sys-web=registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-web:${RELEASE_VERSION}
+
+kubectl -n smartwarehouse rollout status deploy/gateway-service
+kubectl -n smartwarehouse rollout status deploy/sys-service
+kubectl -n smartwarehouse rollout status deploy/portal-shell
+kubectl -n smartwarehouse rollout status deploy/sys-web
+```
+
+回滚时把 4 个业务 Deployment 的镜像 tag 切回上一个已验证版本即可。不要删除 PVC，不要执行会清空 MySQL、Redis、RabbitMQ、Nacos 数据的命令。
+
+### 16.7 安全检查
+
+禁止写入仓库的内容：
+
+```text
+真实 ACR 用户名和密码
+真实 JWT Secret
+真实数据库密码
+真实 RabbitMQ 密码
+Jenkins 管理员密码
+AccessKey 或私钥
+DDNS token
+```
+
+允许写入文档的内容：
+
+```text
+<ACR_USERNAME>
+<ACR_PASSWORD>
+<JWT_SECRET>
+<DB_PASSWORD>
+<RABBITMQ_PASSWORD>
+<RELEASE_VERSION>
+<UBUNTU_LAN_IP>
+```
+
+部署完成且不再需要自动化维护系统组件后，可以撤销 `swadmin` 的临时免密 sudo 权限：
+
+```bash
+sudo rm -f /etc/sudoers.d/90-swadmin-codex
+sudo visudo -c
+```
+
+撤销 sudo 免密不会停止已经运行的 k3s、Pod、Service 或 PVC。
+
 ### 15.8 敏感信息检查
 
 提交前必须检查：

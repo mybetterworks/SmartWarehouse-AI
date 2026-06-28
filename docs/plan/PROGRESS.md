@@ -109,6 +109,36 @@ README 更新结果：
 
 ## 7. 实现记录
 
+### 2026-06-23 V02 Ubuntu k3s + ACR 正式镜像部署
+
+版本：V02
+
+状态：DONE
+
+完成内容：
+- 在 `ubuntu-service` 上安装并启动单节点 k3s，节点 `smartwarehouse-app` 已 Ready。
+- 为 k3s 配置 Docker Hub 镜像源 fallback，解决 `rancher/mirrored-pause`、local-path provisioner 等系统镜像拉取超时问题。
+- 创建 `smartwarehouse` namespace，确认用户手动创建的 `acr-pull-secret` 存在。
+- 在 Ubuntu 服务器上随机生成运行时密码并写入 `smartwarehouse-runtime-secret`，未把真实值写入仓库或文档。
+- 新增 `deploy/k8s/home-server/`，包含存储、中间件、业务服务、edge-nginx 和 MySQL 初始化 Job 清单。
+- 部署 MySQL、Redis、RabbitMQ、Nacos，并使用 PVC 持久化数据。
+- 导入 `deploy/mysql/init-sys-db.sql`，并将正式环境 remoteEntry 修正为同源 `/apps/.../assets/remoteEntry.js`。
+- 部署 ACR 正式镜像 `v0.1.0`：gateway-service、sys-service、portal-shell、sys-web。
+- 部署 `edge-nginx`，通过 NodePort `30080` 统一暴露门户、sys-web 静态资源和 `/api/**` 网关接口。
+
+验证结果：
+- `kubectl -n smartwarehouse get pods` 显示中间件、业务服务和 edge-nginx 均 Running。
+- `curl http://<UBUNTU_LAN_IP>:30080/` 返回 200。
+- `curl http://<UBUNTU_LAN_IP>:30080/apps/sys/assets/remoteEntry.js` 返回 200。
+- `curl http://<UBUNTU_LAN_IP>:30080/api/sys/auth/risk-state?username=admin` 返回 200。
+- 集群内部 gateway 与 sys actuator health 均返回 `UP`。
+
+安全记录：
+- ACR 明文凭证未进入聊天记录、仓库、README、docs 或 YAML。
+- JWT、MySQL、RabbitMQ 等运行时密码只存在 Kubernetes Secret 中。
+- 文档仅使用 `<ACR_USERNAME>`、`<ACR_PASSWORD>`、`<JWT_SECRET>`、`<DB_PASSWORD>`、`<RABBITMQ_PASSWORD>`、`<UBUNTU_LAN_IP>` 等占位符。
+- 部署完成后仍需由用户按需撤销 `swadmin` 临时免密 sudo 权限。
+
 ### 2026-06-11 提示词系统初始化
 
 状态：DONE

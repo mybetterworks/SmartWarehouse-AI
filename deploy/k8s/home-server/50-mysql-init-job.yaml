@@ -1,0 +1,70 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mysql-init-smart-sys
+  namespace: smartwarehouse
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mysql-init-smart-sys
+        app.kubernetes.io/part-of: smartwarehouse-ai
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mysql-init
+          image: mysql:8.4
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartwarehouse-runtime-secret
+                  key: mysql-root-password
+          command:
+            - sh
+            - -ec
+            - |
+              until mysqladmin ping -hmysql -uroot -p"$MYSQL_ROOT_PASSWORD" --silent; do
+                echo "Waiting for mysql..."
+                sleep 5
+              done
+
+              mysql --default-character-set=utf8mb4 -hmysql -uroot -p"$MYSQL_ROOT_PASSWORD" < /sql/init-sys-db.sql
+
+              mysql --default-character-set=utf8mb4 -hmysql -uroot -p"$MYSQL_ROOT_PASSWORD" smart_sys <<'SQL'
+              UPDATE sys_frontend_module
+              SET remote_entry = '/apps/sys/assets/remoteEntry.js',
+                  updated_time = NOW()
+              WHERE module_code = 'sys';
+
+              UPDATE sys_frontend_module
+              SET remote_entry = '/apps/wms/assets/remoteEntry.js',
+                  updated_time = NOW()
+              WHERE module_code = 'wms'
+                AND remote_entry LIKE 'http://localhost:%';
+
+              UPDATE sys_frontend_module
+              SET remote_entry = '/apps/mes/assets/remoteEntry.js',
+                  updated_time = NOW()
+              WHERE module_code = 'mes'
+                AND remote_entry LIKE 'http://localhost:%';
+
+              UPDATE sys_frontend_module
+              SET remote_entry = '/apps/ai/assets/remoteEntry.js',
+                  updated_time = NOW()
+              WHERE module_code = 'ai'
+                AND remote_entry LIKE 'http://localhost:%';
+
+              SELECT module_code, remote_entry FROM sys_frontend_module ORDER BY sort_no;
+              SQL
+          volumeMounts:
+            - name: mysql-init-sql
+              mountPath: /sql
+              readOnly: true
+      volumes:
+        - name: mysql-init-sql
+          configMap:
+            name: mysql-init-sql

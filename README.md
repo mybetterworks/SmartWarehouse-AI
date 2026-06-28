@@ -216,6 +216,75 @@ java -jar gateway/gateway-service/target/gateway-service-*.jar
 - Docker 镜像构建检查曾因 Docker Hub 基础镜像网络连接超时阻塞；网络可用或配置镜像加速器后，可重试 Jenkinsfile 中的 Docker Build 阶段。
 - AI 不会自动向阿里云效 npm 私库推送 snapshot/release 制品，也不会自动执行 `pnpm publish` 或 `npm publish`。平台包版本号设置和真实发布必须由用户手动执行。
 
+## Ubuntu k3s 正式服务更新
+
+家用 Ubuntu 服务器正式部署使用单节点 k3s，业务镜像从阿里云 ACR 私有仓库拉取，中间件运行在同一个 `smartwarehouse` namespace 内并使用 PVC 持久化。对外只暴露 `edge-nginx` 一个 NodePort，默认端口为 `30080`；路由器公网端口转发时，将外部端口转发到 `<UBUNTU_LAN_IP>:30080`。
+
+首次部署前，Ubuntu 服务器需要完成 k3s 初始化，并创建 ACR 拉取凭证：
+
+```bash
+export KUBECONFIG="$HOME/.kube/config"
+
+kubectl create namespace smartwarehouse --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl -n smartwarehouse create secret docker-registry acr-pull-secret \
+  --docker-server=registry.cn-hangzhou.aliyuncs.com \
+  --docker-username="<ACR_USERNAME>" \
+  --docker-password="<ACR_PASSWORD>" \
+  --docker-email="placeholder@example.com"
+```
+
+`acr-pull-secret` 只保存在 Kubernetes Secret 中，真实 ACR 用户名和密码不得写入仓库、README、docs、YAML 或 Jenkinsfile。运行时密码使用 `smartwarehouse-runtime-secret` 保存，可由服务器随机生成；文档中只记录 `<JWT_SECRET>`、`<DB_PASSWORD>` 等占位符。
+
+当前家用服务器 K8s 清单位于 `deploy/k8s/home-server/`，固定入口规则如下：
+
+```text
+http://<UBUNTU_LAN_IP>:30080/                         -> portal-shell
+http://<UBUNTU_LAN_IP>:30080/apps/sys/                 -> sys-web
+http://<UBUNTU_LAN_IP>:30080/api/                      -> gateway-service
+http://<UBUNTU_LAN_IP>:30080/apps/sys/assets/remoteEntry.js
+```
+
+正式版本更新流程：
+
+```bash
+# 1. Jenkins 使用 PUSH_ACR_RELEASE=true 推送正式镜像到 ACR。
+# 2. Ubuntu 服务器上把 4 个业务 Deployment 切换到新的正式版本。
+export KUBECONFIG="$HOME/.kube/config"
+RELEASE_VERSION="<RELEASE_VERSION>"
+
+kubectl -n smartwarehouse set image deploy/gateway-service \
+  gateway-service=registry.cn-hangzhou.aliyuncs.com/smartwarehouse/gateway-service:${RELEASE_VERSION}
+kubectl -n smartwarehouse set image deploy/sys-service \
+  sys-service=registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-service:${RELEASE_VERSION}
+kubectl -n smartwarehouse set image deploy/portal-shell \
+  portal-shell=registry.cn-hangzhou.aliyuncs.com/smartwarehouse/portal-shell:${RELEASE_VERSION}
+kubectl -n smartwarehouse set image deploy/sys-web \
+  sys-web=registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-web:${RELEASE_VERSION}
+
+kubectl -n smartwarehouse rollout status deploy/gateway-service
+kubectl -n smartwarehouse rollout status deploy/sys-service
+kubectl -n smartwarehouse rollout status deploy/portal-shell
+kubectl -n smartwarehouse rollout status deploy/sys-web
+```
+
+更新后验收：
+
+```bash
+curl -f http://<UBUNTU_LAN_IP>:30080/
+curl -f http://<UBUNTU_LAN_IP>:30080/apps/sys/assets/remoteEntry.js
+curl -f "http://<UBUNTU_LAN_IP>:30080/api/sys/auth/risk-state?username=admin"
+```
+
+回滚时不要重新打 `test` 镜像，也不要删除 PVC。直接把 4 个业务 Deployment 的镜像 tag 切回上一个已验证的 `<RELEASE_VERSION>`，再执行 rollout status 和 HTTP 验收即可。
+
+部署完成且不再需要自动化维护系统组件时，可以撤销 `swadmin` 的临时免密 sudo 权限；已经运行的 k3s 服务和业务 Pod 不会因此停止：
+
+```bash
+sudo rm -f /etc/sudoers.d/90-swadmin-codex
+sudo visudo -c
+```
+
 ## 开发节奏
 
 项目按真实商用协作模式推进，不采用“先做完所有后端，再统一补前端”的方式。

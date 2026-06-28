@@ -787,6 +787,26 @@ V02 开始所有后端服务必须按无状态服务开发：
 
 ## 16. 实现记录
 
+### 2026-06-23 家用 Ubuntu k3s 正式部署补充
+
+V02 正式镜像已经支持部署到家用 Ubuntu 单节点 k3s。部署约定如下：
+
+- Kubernetes 运行时使用单节点 k3s，命名空间为 `smartwarehouse`。
+- 业务镜像从阿里云 ACR 拉取，固定使用正式版本 tag，不依赖 `latest`。
+- 当前已验证版本为 `v0.1.0`，包含 `gateway-service`、`sys-service`、`portal-shell`、`sys-web` 四个业务镜像。
+- MySQL、Redis、RabbitMQ、Nacos 部署在同一个 namespace 内，并通过 PVC 持久化。
+- 对外入口统一为 `edge-nginx`，NodePort 为 `30080`，后续公网访问通过路由器端口转发到 `<UBUNTU_LAN_IP>:30080`。
+- ACR 凭证只保存为 Kubernetes `acr-pull-secret`，运行时密码只保存为 `smartwarehouse-runtime-secret`；仓库和文档只允许写占位符。
+- MySQL 初始化 Job 会把 `sys_frontend_module.remote_entry` 修正为同源 `/apps/.../assets/remoteEntry.js`，避免公网访问时浏览器请求访问者本机 `localhost`。
+
+验收结果：
+
+- `kubectl -n smartwarehouse rollout status` 已验证 gateway、sys、portal-shell、sys-web、edge-nginx 全部完成发布。
+- `curl http://<UBUNTU_LAN_IP>:30080/` 返回 200。
+- `curl http://<UBUNTU_LAN_IP>:30080/apps/sys/assets/remoteEntry.js` 返回 200。
+- `curl http://<UBUNTU_LAN_IP>:30080/api/sys/auth/risk-state?username=admin` 返回 200。
+- 集群内部 `gateway-service:9200/actuator/health` 与 `sys-service:9201/actuator/health` 均返回 `UP`。
+
 ```text
 日期：2026-06-13
 状态：DONE

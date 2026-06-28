@@ -1,0 +1,263 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+  namespace: smartwarehouse
+spec:
+  selector:
+    app.kubernetes.io/name: gateway-service
+  ports:
+    - name: http
+      port: 9200
+      targetPort: 9200
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-service
+  namespace: smartwarehouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway-service
+        app.kubernetes.io/part-of: smartwarehouse-ai
+    spec:
+      imagePullSecrets:
+        - name: acr-pull-secret
+      containers:
+        - name: gateway-service
+          image: registry.cn-hangzhou.aliyuncs.com/smartwarehouse/gateway-service:v0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9200
+              name: http
+          env:
+            - name: JAVA_OPTS
+              value: -XX:MaxRAMPercentage=75.0
+            - name: SMARTWAREHOUSE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: smartwarehouse-runtime-secret
+                  key: smartwarehouse-jwt-secret
+            - name: SYS_SERVICE_URI
+              value: http://sys-service:9201
+            - name: SMARTWAREHOUSE_REDIS_HOST
+              value: redis
+            - name: SMARTWAREHOUSE_REDIS_PORT
+              value: "6379"
+            - name: SMARTWAREHOUSE_NACOS_SERVER_ADDR
+              value: nacos:8848
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 9200
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 9200
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sys-service
+  namespace: smartwarehouse
+spec:
+  selector:
+    app.kubernetes.io/name: sys-service
+  ports:
+    - name: http
+      port: 9201
+      targetPort: 9201
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sys-service
+  namespace: smartwarehouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sys-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sys-service
+        app.kubernetes.io/part-of: smartwarehouse-ai
+    spec:
+      imagePullSecrets:
+        - name: acr-pull-secret
+      containers:
+        - name: sys-service
+          image: registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-service:v0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9201
+              name: http
+          env:
+            - name: JAVA_OPTS
+              value: -XX:MaxRAMPercentage=75.0
+            - name: SMARTWAREHOUSE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: smartwarehouse-runtime-secret
+                  key: smartwarehouse-jwt-secret
+            - name: SMARTWAREHOUSE_DEMO_PASSWORD
+              value: "123456"
+            - name: SMARTWAREHOUSE_SYS_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/smart_sys?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+            - name: SMARTWAREHOUSE_SYS_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: smartwarehouse-runtime-secret
+                  key: mysql-app-user
+            - name: SMARTWAREHOUSE_SYS_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartwarehouse-runtime-secret
+                  key: mysql-app-password
+            - name: SMARTWAREHOUSE_REDIS_HOST
+              value: redis
+            - name: SMARTWAREHOUSE_REDIS_PORT
+              value: "6379"
+            - name: SMARTWAREHOUSE_NACOS_SERVER_ADDR
+              value: nacos:8848
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 9201
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 9201
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 300m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1280Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal-shell
+  namespace: smartwarehouse
+spec:
+  selector:
+    app.kubernetes.io/name: portal-shell
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portal-shell
+  namespace: smartwarehouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: portal-shell
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: portal-shell
+        app.kubernetes.io/part-of: smartwarehouse-ai
+    spec:
+      imagePullSecrets:
+        - name: acr-pull-secret
+      containers:
+        - name: portal-shell
+          image: registry.cn-hangzhou.aliyuncs.com/smartwarehouse/portal-shell:v0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sys-web
+  namespace: smartwarehouse
+spec:
+  selector:
+    app.kubernetes.io/name: sys-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sys-web
+  namespace: smartwarehouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sys-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sys-web
+        app.kubernetes.io/part-of: smartwarehouse-ai
+    spec:
+      imagePullSecrets:
+        - name: acr-pull-secret
+      containers:
+        - name: sys-web
+          image: registry.cn-hangzhou.aliyuncs.com/smartwarehouse/sys-web:v0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /apps/sys/assets/remoteEntry.js
+              port: 80
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi

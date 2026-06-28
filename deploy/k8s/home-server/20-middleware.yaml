@@ -1,0 +1,320 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: smartwarehouse
+spec:
+  selector:
+    app.kubernetes.io/name: mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: smartwarehouse
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mysql
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mysql
+        app.kubernetes.io/part-of: smartwarehouse-ai
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartwarehouse-runtime-secret
+                  key: mysql-root-password
+            - name: MYSQL_DATABASE
+              value: smart_sys
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: smartwarehouse-runtime-secret
+                  key: mysql-app-user
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartwarehouse-runtime-secret
+                  key: mysql-app-password
+            - name: TZ
+              value: Asia/Shanghai
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -ec
+                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -ec
+                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 300m
+              memory: 768Mi
+            limits:
+              cpu: "1"
+              memory: 1536Mi
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: mysql-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: smartwarehouse
+spec:
+  selector:
+    app.kubernetes.io/name: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: smartwarehouse
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/part-of: smartwarehouse-ai
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.4
+          imagePullPolicy: IfNotPresent
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+          ports:
+            - containerPort: 6379
+              name: redis
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: smartwarehouse
+spec:
+  selector:
+    app.kubernetes.io/name: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: smartwarehouse
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+        app.kubernetes.io/part-of: smartwarehouse-ai
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: smartwarehouse-runtime-secret
+                  key: rabbitmq-user
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: smartwarehouse-runtime-secret
+                  key: rabbitmq-password
+            - name: TZ
+              value: Asia/Shanghai
+          startupProbe:
+            exec:
+              command:
+                - rabbitmq-diagnostics
+                - -q
+                - ping
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - rabbitmq-diagnostics
+                - -q
+                - ping
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: rabbitmq-data
+              mountPath: /var/lib/rabbitmq
+      volumes:
+        - name: rabbitmq-data
+          persistentVolumeClaim:
+            claimName: rabbitmq-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nacos
+  namespace: smartwarehouse
+spec:
+  selector:
+    app.kubernetes.io/name: nacos
+  ports:
+    - name: http
+      port: 8848
+      targetPort: 8848
+    - name: grpc
+      port: 9848
+      targetPort: 9848
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nacos
+  namespace: smartwarehouse
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nacos
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nacos
+        app.kubernetes.io/part-of: smartwarehouse-ai
+    spec:
+      containers:
+        - name: nacos
+          image: nacos/nacos-server:v2.4.3
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8848
+              name: http
+            - containerPort: 9848
+              name: grpc
+          env:
+            - name: MODE
+              value: standalone
+            - name: JVM_XMS
+              value: 256m
+            - name: JVM_XMX
+              value: 512m
+            - name: JVM_XMN
+              value: 128m
+            - name: TZ
+              value: Asia/Shanghai
+          startupProbe:
+            httpGet:
+              path: /nacos/actuator/health
+              port: 8848
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /nacos/actuator/health
+              port: 8848
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 300m
+              memory: 768Mi
+            limits:
+              cpu: "1"
+              memory: 1536Mi
+          volumeMounts:
+            - name: nacos-data
+              mountPath: /home/nacos/data
+      volumes:
+        - name: nacos-data
+          persistentVolumeClaim:
+            claimName: nacos-data

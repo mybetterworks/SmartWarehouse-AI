@@ -203,7 +203,7 @@ pipeline {
             -w "$WORKSPACE" \
             -e MAVEN_OPTS="$MAVEN_OPTS" \
             "$MAVEN_IMAGE" \
-            mvn package -DskipTests
+            mvn clean package -DskipTests
         '''
       }
     }

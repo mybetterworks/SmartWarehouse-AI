@@ -132,3 +132,109 @@ corepack pnpm --filter @smartwarehouse/sys-web preview
   - 再打开“角色管理”“字典管理”后，tab 列表继续累加，当前 tab 高亮正常。
   - 刷新 `http://localhost:5174/sys/users` 后，已打开 tabs 保留，当前仍停留在“用户管理”。
   - 字典管理切换到 `dictCode=data_scope` 后，刷新仍保持 `data_scope`，不会回退到默认字典类型。
+
+## 7. maven发布流程
+
+- maven制品包括：
+  - platform-parent
+  - platform-bom
+  - platform-common-core
+  - platform-common-web
+  - platform-common-data
+  - platform-common-security-lite
+  - platform-common-redis
+  - platform-common-mq
+  - platform-common-log
+  - platform-common-id
+  - sys-api
+  - task-api
+  - mes-api
+  - wms-api
+
+- 发布snapshot版
+  - 修改版本号为0.1.0-SNAPSHOT
+  - cd E:\Code\codex\SmartWarehouse-AI
+  - mvn -pl platform/platform-bom,platform/platform-parent,platform/platform-common-core,platform/platform-common-log,platform/platform-common-web,platform/platform-common-data,platform/platform-common-security-lite,platform/platform-common-redis,platform/platform-common-mq,platform/platform-common-id,sys/sys-api clean install -DskipTests
+  - mvn -pl platform/platform-bom clean deploy -DskipTests
+  - mvn -pl platform/platform-parent clean deploy -DskipTests
+  - mvn -pl platform/platform-common-core,platform/platform-common-log,platform/platform-common-web,platform/platform-common-data,platform/platform-common-security-lite,platform/platform-common-redis,platform/platform-common-mq,platform/platform-common-id,sys/sys-api clean deploy -DskipTests
+  - 如果第三条遇到依赖解析问题，再改用：
+  - mvn -pl platform/platform-common-core,platform/platform-common-log,platform/platform-common-web,platform/platform-common-data,platform/platform-common-security-lite,platform/platform-common-redis,platform/platform-common-mq,platform/platform-common-id,sys/sys-api -am clean deploy -DskipTests
+
+- 发布release版
+  - 修改版本号为0.1.0
+  - cd E:\Code\codex\SmartWarehouse-AI
+  - mvn -pl platform/platform-bom,platform/platform-parent,platform/platform-common-core,platform/platform-common-log,platform/platform-common-web,platform/platform-common-data,platform/platform-common-security-lite,platform/platform-common-redis,platform/platform-common-mq,platform/platform-common-id,sys/sys-api clean install -DskipTests
+  - mvn -pl platform/platform-bom clean deploy -DskipTests
+  - mvn -pl platform/platform-parent clean deploy -DskipTests
+  - mvn -pl platform/platform-common-core,platform/platform-common-log,platform/platform-common-web,platform/platform-common-data,platform/platform-common-security-lite,platform/platform-common-redis,platform/platform-common-mq,platform/platform-common-id,sys/sys-api clean deploy -DskipTests
+
+## 8.npm发布
+
+- 发布npm制品对象范围：
+  @smartwarehouse/platform-types
+  @smartwarehouse/platform-theme
+  @smartwarehouse/platform-sdk
+  @smartwarehouse/platform-ui
+- 确认.npmrc文件
+```text
+registry=<你的云效 npm snapshot 仓库 registry 地址>
+@smartwarehouse:registry=<你的云效 npm snapshot 仓库 registry 地址>
+
+always-auth=true
+
+//<你的 snapshot registry host 和 path>/:_authToken=${SMARTWAREHOUSE_SNAPSHOT_TOKEN}
+//<你的 release registry host 和 path>/:_authToken=${SMARTWAREHOUSE_RELEASE_TOKEN}
+
+sass_binary_site=https://npmmirror.com/mirrors/node-sass/
+phantomjs_cdnurl=https://cdn.npmmirror.com/binaries/phantomjs
+electron_mirror=https://cdn.npmmirror.com/binaries/electron/
+chromedriver_cdnurl=https://cdn.npmmirror.com/binaries/chromedriver
+```
+- 发布snapshot版
+  - 修改版本号为：0.2.0-snapshot.1
+  - 修改.npmrc文件的registry和@smartwarehouse:registry为snapshot仓库地址
+  - cd E:\Code\codex\SmartWarehouse-AI\frontend-platform
+  - 启用 Node.js 自带的 Corepack 包管理器代理。
+    corepack enable
+  - 下载并激活指定版本的 pnpm。
+    corepack prepare pnpm@10.12.1 --activate
+  - 按照 pnpm-lock.yaml 精确安装依赖。
+    corepack pnpm install --frozen-lockfile
+  - 构建要发布的 4 个 npm 平台包。
+    corepack pnpm build:packages
+  - 只构建组件文档站。
+    corepack pnpm --filter @smartwarehouse/component-docs build
+  - 预演 snapshot 发布，不真正上传 npm 包。
+    corepack pnpm publish:dry-run:snapshot
+  - 真正发布 snapshot npm 制品。
+    corepack pnpm publish:snapshot
+
+- 发布release版
+  - 修改版本号为：0.2.0
+  - 修改.npmrc文件的registry和@smartwarehouse:registry为release仓库地址
+  - cd E:\Code\codex\SmartWarehouse-AI\frontend-platform
+  - 启用 Node.js 自带的 Corepack 包管理器代理。
+    corepack enable
+  - 下载并激活指定版本的 pnpm。
+    corepack prepare pnpm@10.12.1 --activate
+  - 按照 pnpm-lock.yaml 精确安装依赖。
+    corepack pnpm install --frozen-lockfile
+  - 构建要发布的 4 个 npm 平台包。
+    corepack pnpm build:packages
+  - 只构建组件文档站。
+    corepack pnpm --filter @smartwarehouse/component-docs build
+  - 预演 release 发布，不真正上传 npm 包。
+    corepack pnpm publish:dry-run:release
+  - 真正发布 release npm 制品。
+    corepack pnpm publish:release
+
+- pom脚本命令中不需要指定仓库地址，仓库地址以.npmrc文件中的registry和@smartwarehouse:registry设置的为准
+
+## 9.镜像发布
+- 在Jenkins构建时
+  - 勾选PUSH_ACR_RELEASE
+  - 填写RELEASE_VERSION
+  - 勾选PUSH_LATEST
+
+

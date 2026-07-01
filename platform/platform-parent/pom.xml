@@ -13,7 +13,7 @@
 
     <groupId>com.smartwarehouse</groupId>
     <artifactId>platform-parent</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.0</version>
     <packaging>pom</packaging>
 
     <name>SmartWarehouse-AI Platform Parent</name>
@@ -82,12 +82,12 @@
 
     <distributionManagement>
         <repository>
-            <id>aliyun-yunxiao-release</id>
-            <url>${env.MAVEN_RELEASE_REPOSITORY_URL}</url>
+            <id>smartwarehouse-maven-release</id>
+            <url>https://packages.aliyun.com/62b95dfe487c500c27f679ef/maven/smartwarehouse-maven-release</url>
         </repository>
         <snapshotRepository>
-            <id>aliyun-yunxiao-snapshot</id>
-            <url>${env.MAVEN_SNAPSHOT_REPOSITORY_URL}</url>
+            <id>smartwarehouse-maven-snapshot</id>
+            <url>https://packages.aliyun.com/62b95dfe487c500c27f679ef/maven/smartwarehouse-maven-snapshot</url>
         </snapshotRepository>
     </distributionManagement>
 </project>

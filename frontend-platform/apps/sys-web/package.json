@@ -1,6 +1,6 @@
 {
   "name": "@smartwarehouse/sys-web",
-  "version": "0.2.0-snapshot.1",
+  "version": "0.2.0",
   "private": true,
   "description": "SmartWarehouse-AI 甲方系统管理前端。",
   "type": "module",

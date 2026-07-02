@@ -151,6 +151,25 @@ corepack pnpm --filter @smartwarehouse/sys-web preview
   - mes-api
   - wms-api
 
+- 要检查pom版本的文件包括
+  - pom.xml
+  - platform/pom.xml
+  - platform/platform-bom/pom.xml
+  - platform/platform-parent/pom.xml
+  - platform/platform-common-core/pom.xml
+  - platform/platform-common-web/pom.xml
+  - platform/platform-common-data/pom.xml
+  - platform/platform-common-security-lite/pom.xml
+  - platform/platform-common-redis/pom.xml
+  - platform/platform-common-mq/pom.xml
+  - platform/platform-common-log/pom.xml
+  - platform/platform-common-id/pom.xml
+  - gateway/pom.xml
+  - gateway/gateway-service/pom.xml
+  - sys/pom.xml
+  - sys/sys-api/pom.xml
+  - sys/sys-service/pom.xml
+
 - 发布snapshot版
   - 修改版本号为0.1.0-SNAPSHOT
   - cd E:\Code\codex\SmartWarehouse-AI

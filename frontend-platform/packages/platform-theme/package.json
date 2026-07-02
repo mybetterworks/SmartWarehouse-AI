@@ -1,6 +1,6 @@
 {
   "name": "@smartwarehouse/platform-theme",
-  "version": "0.2.0",
+  "version": "0.3.0-snapshot.1",
   "description": "Shared theme tokens and Element Plus overrides for SmartWarehouse-AI.",
   "type": "module",
   "main": "./dist/index.umd.cjs",

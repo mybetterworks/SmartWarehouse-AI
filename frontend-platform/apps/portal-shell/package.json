@@ -1,6 +1,6 @@
 {
   "name": "@smartwarehouse/portal-shell",
-  "version": "0.2.0",
+  "version": "0.3.0-snapshot.1",
   "private": true,
   "description": "SmartWarehouse-AI 甲方统一门户基座。",
   "type": "module",

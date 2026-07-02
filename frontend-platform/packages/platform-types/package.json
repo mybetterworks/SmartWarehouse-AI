@@ -1,6 +1,6 @@
 {
   "name": "@smartwarehouse/platform-types",
-  "version": "0.2.0",
+  "version": "0.3.0-snapshot.1",
   "description": "Shared TypeScript contracts for SmartWarehouse-AI frontend projects.",
   "type": "module",
   "main": "./dist/index.umd.cjs",

@@ -1,6 +1,6 @@
 {
   "name": "@smartwarehouse/platform-sdk",
-  "version": "0.2.0",
+  "version": "0.3.0-snapshot.1",
   "description": "Frontend SDK for SmartWarehouse-AI platform integration.",
   "type": "module",
   "main": "./dist/index.umd.cjs",
